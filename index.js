@@ -24,20 +24,28 @@ const client = new MongoClient(uri, {
 });
 
 async function run() {
-    const userCollection = client.db("synapse").collection("users");
-
     try {
         // Connect the client to the server	(optional starting in v4.7)
         await client.connect();
+
+        const userCollection = client.db("synapse").collection("users");
 
         // ---------------------------
         // ---------- users ----------
         // ---------------------------
 
-        // post
+        // insert a single user
         app.post('/users', async (req, res) => {
             const user = req.body;
             const result = await userCollection.insertOne(user);
+            res.send(result);
+        })
+
+        // get a user by email
+        app.post('/users/email', async(req,res) => {
+            const {email} = req.body;
+            const query = { email: email }
+            const result = await userCollection.findOne(query);
             res.send(result);
         })
 
