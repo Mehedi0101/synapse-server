@@ -42,10 +42,21 @@ async function run() {
         })
 
         // get a user by email
-        app.post('/users/email', async(req,res) => {
-            const {email} = req.body;
+        app.post('/users/email', async (req, res) => {
+            const { email } = req.body;
             const query = { email: email }
             const result = await userCollection.findOne(query);
+            res.send(result);
+        })
+
+        // update a user by email
+        app.patch('/users/email', async (req, res) => {
+            const { email, updatedData } = req.body;
+            const query = { email: email };
+            const result = await userCollection.updateOne(
+                query,
+                { $set: updatedData }
+            );
             res.send(result);
         })
 
