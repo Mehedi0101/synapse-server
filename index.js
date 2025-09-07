@@ -29,6 +29,7 @@ async function run() {
         await client.connect();
 
         const userCollection = client.db("synapse").collection("users");
+        const connectionCollection = client.db("synapse").collection("connections");
 
         // ---------------------------
         // ---------- users ----------
@@ -36,7 +37,7 @@ async function run() {
 
         // get all users
         app.get('/users', async (req, res) => {
-            const result = await userCollection.find({}, { projection: { name: 1, department: 1, role: 1, userImage: 1 } }).toArray();
+            const result = await userCollection.find({}, { projection: { email: 1, name: 1, department: 1, role: 1, userImage: 1 } }).toArray();
             res.send(result);
         })
 
@@ -65,6 +66,17 @@ async function run() {
                 query,
                 { $set: updatedData }
             );
+            res.send(result);
+        })
+
+        // ---------------------------------
+        // ---------- connections ----------
+        // ---------------------------------
+        
+        // insert a connection request
+        app.post('/connections', async(req,res) => {
+            const data = req.body;
+            const result = await connectionCollection.insertOne(data);
             res.send(result);
         })
 
