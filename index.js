@@ -37,7 +37,30 @@ async function run() {
 
         // get all users
         app.get('/users', async (req, res) => {
-            const result = await userCollection.find({}, { projection: { email: 1, name: 1, department: 1, role: 1, userImage: 1 } }).toArray();
+            const result = await userCollection.find({}, { projection: { name: 1, department: 1, role: 1, userImage: 1 } }).toArray();
+            res.send(result);
+        })
+
+        // get only available users for connection request
+        app.get('/users/available/:id', async (req, res) => {
+            const { id } = req.params;
+
+            const requests = await connectionCollection.find({
+                $or: [{ from: id }, { to: id }]
+            }).toArray();
+
+            const excludeId = [id];
+
+            requests.forEach(request => {
+                excludeId.push(request.from);
+                excludeId.push(request.to);
+            })
+
+            const result = await userCollection.find(
+                { _id: { $nin: excludeId.map(id => new ObjectId(id)) } },
+                { projection: { name: 1, department: 1, role: 1, userImage: 1 } }
+            ).toArray();
+
             res.send(result);
         })
 
@@ -59,9 +82,10 @@ async function run() {
 
 
         // update a user by email
-        app.patch('/users/email', async (req, res) => {
-            const { email, updatedData } = req.body;
-            const query = { email: email };
+        app.patch('/users/:id', async (req, res) => {
+            const { id } = req.params;
+            const updatedData = req.body;
+            const query = { _id: new ObjectId(id) };
             const result = await userCollection.updateOne(
                 query,
                 { $set: updatedData }
@@ -72,10 +96,11 @@ async function run() {
         // ---------------------------------
         // ---------- connections ----------
         // ---------------------------------
-        
+
         // insert a connection request
-        app.post('/connections', async(req,res) => {
+        app.post('/connections', async (req, res) => {
             const data = req.body;
+            data.createdAt = new Date();
             const result = await connectionCollection.insertOne(data);
             res.send(result);
         })
