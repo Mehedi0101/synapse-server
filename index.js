@@ -34,10 +34,9 @@ async function run() {
         // ---------- users ----------
         // ---------------------------
 
-        // insert a single user
-        app.post('/users', async (req, res) => {
-            const user = req.body;
-            const result = await userCollection.insertOne(user);
+        // get all users
+        app.get('/users', async (req, res) => {
+            const result = await userCollection.find({}, { projection: { name: 1, department: 1, role: 1, userImage: 1 } }).toArray();
             res.send(result);
         })
 
@@ -48,6 +47,15 @@ async function run() {
             const result = await userCollection.findOne(query);
             res.send(result);
         })
+
+        // insert a single user
+        app.post('/users', async (req, res) => {
+            const user = req.body;
+            const result = await userCollection.insertOne(user);
+            res.send(result);
+        })
+
+
 
         // update a user by email
         app.patch('/users/email', async (req, res) => {
