@@ -41,6 +41,21 @@ async function run() {
             res.send(result);
         })
 
+        // get a user by id
+        app.get('/users/:id', async (req, res) => {
+            const { id } = req.params;
+            const result = await userCollection.findOne({ _id: new ObjectId(id) });
+            res.send(result);
+        })
+
+        // get a user by email
+        app.post('/users/email', async (req, res) => {
+            const { email } = req.body;
+            const query = { email: email }
+            const result = await userCollection.findOne(query);
+            res.send(result);
+        })
+
         // get only available users for connection request
         app.get('/users/available/:id', async (req, res) => {
             const { id } = req.params;
@@ -64,13 +79,6 @@ async function run() {
             res.send(result);
         })
 
-        // get a user by email
-        app.post('/users/email', async (req, res) => {
-            const { email } = req.body;
-            const query = { email: email }
-            const result = await userCollection.findOne(query);
-            res.send(result);
-        })
 
         // insert a single user
         app.post('/users', async (req, res) => {
@@ -98,6 +106,39 @@ async function run() {
         // ---------------------------------
         // ---------- connections ----------
         // ---------------------------------
+
+        // get all received connection request
+        app.get('/connections/received/:id', async (req, res) => {
+            const { id } = req.params;
+
+            const result = await connectionCollection.aggregate([
+                { $match: { to: new ObjectId(id), status: "pending" } },
+
+                {
+                    $lookup: {
+                        from: "users",
+                        localField: "from",
+                        foreignField: "_id",
+                        as: "fromUser"
+                    }
+                },
+                { $unwind: "$fromUser" },
+                {
+                    $project: {
+                        _id: 1,
+                        status: 1,
+                        createdAt: 1,
+                        "fromUser._id": 1,
+                        "fromUser.name": 1,
+                        "fromUser.department": 1,
+                        "fromUser.role": 1,
+                        "fromUser.userImage": 1
+                    }
+                }
+            ]).toArray();
+
+            res.send(result);
+        })
 
         // get all sent connection request
         app.get('/connections/sent/:id', async (req, res) => {
@@ -154,6 +195,19 @@ async function run() {
             res.send(result);
         })
 
+        // for accepting a connection request
+        app.patch('/connections/accept', async (req, res) => {
+            const { id } = req.body;
+
+            const result = await connectionCollection.updateOne(
+                { _id: new ObjectId(id) },
+                { $set: { status: "accepted" } }
+            );
+
+            res.send(result);
+        });
+
+        // for cancelling a connection request
         app.delete('/connections/:id', async (req, res) => {
             const { id } = req.params;
             const result = await connectionCollection.deleteOne({ _id: new ObjectId(id) });
