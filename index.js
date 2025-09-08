@@ -46,7 +46,7 @@ async function run() {
             const { id } = req.params;
 
             const requests = await connectionCollection.find({
-                $or: [{ from: id }, { to: id }]
+                $or: [{ from: new ObjectId(id) }, { to: new ObjectId(id) }]
             }).toArray();
 
             const excludeId = [id];
@@ -93,15 +93,70 @@ async function run() {
             res.send(result);
         })
 
+
+
         // ---------------------------------
         // ---------- connections ----------
         // ---------------------------------
 
+        // get all sent connection request
+        app.get('/connections/sent/:id', async (req, res) => {
+            const { id } = req.params;
+
+            const result = await connectionCollection.aggregate([
+                { $match: { from: new ObjectId(id), status: "pending" } },
+
+                {
+                    $lookup: {
+                        from: "users",
+                        localField: "to",
+                        foreignField: "_id",
+                        as: "toUser"
+                    }
+                },
+                { $unwind: "$toUser" },
+                {
+                    $project: {
+                        _id: 1,
+                        status: 1,
+                        createdAt: 1,
+                        "toUser._id": 1,
+                        "toUser.name": 1,
+                        "toUser.department": 1,
+                        "toUser.role": 1,
+                        "toUser.userImage": 1
+                    }
+                }
+            ]).toArray();
+
+            res.send(result);
+        })
+
         // insert a connection request
         app.post('/connections', async (req, res) => {
-            const data = req.body;
-            data.createdAt = new Date();
+            const { from, to, status } = req.body;
+            const existing = await connectionCollection.findOne({
+                $or: [
+                    { from: new ObjectId(from), to: new ObjectId(to) },
+                    { from: new ObjectId(to), to: new ObjectId(from) }
+                ]
+            });
+            if (existing) {
+                return res.send({ acknowledged: "true" });
+            }
+            const data = {
+                from: new ObjectId(from),
+                to: new ObjectId(to),
+                status,
+                createdAt: new Date()
+            }
             const result = await connectionCollection.insertOne(data);
+            res.send(result);
+        })
+
+        app.delete('/connections/:id', async (req, res) => {
+            const { id } = req.params;
+            const result = await connectionCollection.deleteOne({ _id: new ObjectId(id) });
             res.send(result);
         })
 
