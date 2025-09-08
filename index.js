@@ -173,6 +173,57 @@ async function run() {
             res.send(result);
         })
 
+        // get all accepted connections
+        app.get('/connections/accepted/:id', async (req, res) => {
+            const { id } = req.params;
+
+            const result = await connectionCollection.aggregate([
+                {
+                    $match: {
+                        $or: [
+                            { from: new ObjectId(id) },
+                            { to: new ObjectId(id) }
+                        ],
+                        status: "accepted"
+                    }
+                },
+                {
+                    $addFields: {
+                        otherUserId: {
+                            $cond: [
+                                { $eq: ["$from", new ObjectId(id)] },
+                                "$to",
+                                "$from"
+                            ]
+                        }
+                    }
+                },
+                {
+                    $lookup: {
+                        from: "users",
+                        localField: "otherUserId",
+                        foreignField: "_id",
+                        as: "otherUser"
+                    }
+                },
+                { $unwind: "$otherUser" },
+                {
+                    $project: {
+                        _id: 1,          // connection ID (for delete action)
+                        status: 1,
+                        createdAt: 1,
+                        "otherUser._id": 1,
+                        "otherUser.name": 1,
+                        "otherUser.department": 1,
+                        "otherUser.role": 1,
+                        "otherUser.userImage": 1
+                    }
+                }
+            ]).toArray();
+
+            res.send(result);
+        });
+
         // insert a connection request
         app.post('/connections', async (req, res) => {
             const { from, to, status } = req.body;
