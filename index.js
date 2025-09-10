@@ -30,6 +30,7 @@ async function run() {
 
         const userCollection = client.db("synapse").collection("users");
         const connectionCollection = client.db("synapse").collection("connections");
+        const postCollection = client.db("synapse").collection("posts");
 
         // ---------------------------
         // ---------- users ----------
@@ -41,12 +42,14 @@ async function run() {
             res.send(result);
         })
 
+
         // get a user by id
         app.get('/users/:id', async (req, res) => {
             const { id } = req.params;
             const result = await userCollection.findOne({ _id: new ObjectId(id) });
             res.send(result);
         })
+
 
         // get a user by email
         app.post('/users/email', async (req, res) => {
@@ -55,6 +58,7 @@ async function run() {
             const result = await userCollection.findOne(query);
             res.send(result);
         })
+
 
         // get only available users for connection request
         app.get('/users/available/:id', async (req, res) => {
@@ -87,8 +91,7 @@ async function run() {
             res.send(result);
         })
 
-
-
+        
         // update a user by email
         app.patch('/users/:id', async (req, res) => {
             const { id } = req.params;
@@ -101,6 +104,101 @@ async function run() {
             res.send(result);
         })
 
+
+
+        // ---------------------------
+        // ---------- posts ----------
+        // ---------------------------
+
+        // get all post
+        app.get("/posts", async (req, res) => {
+            const result = await postCollection.aggregate([
+                // sort by createdAt descending (latest first)
+                { $sort: { createdAt: -1 } },
+
+                // lookup author info
+                {
+                    $lookup: {
+                        from: "users",
+                        localField: "authorId",
+                        foreignField: "_id",
+                        as: "author"
+                    }
+                },
+                { $unwind: "$author" },
+
+                // lookup commenter info for each comment
+                {
+                    $lookup: {
+                        from: "users",
+                        localField: "comments.commenterId",
+                        foreignField: "_id",
+                        as: "commenters"
+                    }
+                },
+
+                // merge commenter details back into each comment
+                {
+                    $addFields: {
+                        comments: {
+                            $map: {
+                                input: "$comments",
+                                as: "c",
+                                in: {
+                                    _id: "$$c._id",
+                                    comment: "$$c.comment",
+                                    createdAt: "$$c.createdAt",
+                                    commenter: {
+                                        $arrayElemAt: [
+                                            {
+                                                $filter: {
+                                                    input: "$commenters",
+                                                    as: "u",
+                                                    cond: { $eq: ["$$u._id", "$$c.commenterId"] }
+                                                }
+                                            },
+                                            0
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+
+                // project only required fields
+                {
+                    $project: {
+                        postContent: 1,
+                        createdAt: 1,
+                        "author._id": 1,
+                        "author.name": 1,
+                        "author.role": 1,
+                        "author.department": 1,
+                        "author.userImage": 1,
+                        comments: 1
+                    }
+                }
+            ]).toArray();
+
+            res.send(result);
+        });
+
+
+        // insert a post
+        app.post('/posts', async (req, res) => {
+            const { authorId, postContent } = req.body;
+
+            const postData = {
+                authorId: new ObjectId(authorId),
+                postContent,
+                createdAt: new Date(),
+                comments: []
+            }
+
+            const result = await postCollection.insertOne(postData);
+            res.send(result);
+        })
 
 
         // ---------------------------------
