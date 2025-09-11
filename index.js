@@ -44,9 +44,9 @@ async function run() {
 
 
         // get a user by id
-        app.get('/users/:id', async (req, res) => {
-            const { id } = req.params;
-            const result = await userCollection.findOne({ _id: new ObjectId(id) });
+        app.get('/users/:userId', async (req, res) => {
+            const { userId } = req.params;
+            const result = await userCollection.findOne({ _id: new ObjectId(userId) });
             res.send(result);
         })
 
@@ -61,14 +61,14 @@ async function run() {
 
 
         // get only available users for connection request
-        app.get('/users/available/:id', async (req, res) => {
-            const { id } = req.params;
+        app.get('/users/available/:userId', async (req, res) => {
+            const { userId } = req.params;
 
             const requests = await connectionCollection.find({
-                $or: [{ from: new ObjectId(id) }, { to: new ObjectId(id) }]
+                $or: [{ from: new ObjectId(userId) }, { to: new ObjectId(userId) }]
             }).toArray();
 
-            const excludeId = [id];
+            const excludeId = [userId];
 
             requests.forEach(request => {
                 excludeId.push(request.from);
@@ -91,12 +91,12 @@ async function run() {
             res.send(result);
         })
 
-        
-        // update a user by email
-        app.patch('/users/:id', async (req, res) => {
-            const { id } = req.params;
+
+        // update a user by id
+        app.patch('/users/:userId', async (req, res) => {
+            const { userId } = req.params;
             const updatedData = req.body;
-            const query = { _id: new ObjectId(id) };
+            const query = { _id: new ObjectId(userId) };
             const result = await userCollection.updateOne(
                 query,
                 { $set: updatedData }
@@ -116,23 +116,29 @@ async function run() {
                 // sort by createdAt descending (latest first)
                 { $sort: { createdAt: -1 } },
 
-                // lookup author info
+                // lookup author info (only needed fields)
                 {
                     $lookup: {
                         from: "users",
-                        localField: "authorId",
-                        foreignField: "_id",
+                        let: { authorId: "$authorId" },
+                        pipeline: [
+                            { $match: { $expr: { $eq: ["$_id", "$$authorId"] } } },
+                            { $project: { name: 1, role: 1, department: 1, userImage: 1 } }
+                        ],
                         as: "author"
                     }
                 },
                 { $unwind: "$author" },
 
-                // lookup commenter info for each comment
+                // lookup commenter info for each comment (only needed fields)
                 {
                     $lookup: {
                         from: "users",
-                        localField: "comments.commenterId",
-                        foreignField: "_id",
+                        let: { commenterIds: "$comments.commenterId" },
+                        pipeline: [
+                            { $match: { $expr: { $in: ["$_id", "$$commenterIds"] } } },
+                            { $project: { name: 1, role: 1, department: 1, userImage: 1 } }
+                        ],
                         as: "commenters"
                     }
                 },
@@ -171,11 +177,7 @@ async function run() {
                     $project: {
                         postContent: 1,
                         createdAt: 1,
-                        "author._id": 1,
-                        "author.name": 1,
-                        "author.role": 1,
-                        "author.department": 1,
-                        "author.userImage": 1,
+                        author: 1,
                         comments: 1
                     }
                 }
@@ -200,17 +202,105 @@ async function run() {
             res.send(result);
         })
 
+        // patching a post for adding a comment
+        app.patch('/posts/comments/:postId', async (req, res) => {
+            const { postId } = req.params;
+            const { commenterId, comment } = req.body;
+
+            const commentData = {
+                _id: new ObjectId(),
+                commenterId: new ObjectId(commenterId),
+                comment,
+                createdAt: new Date()
+            };
+
+            await postCollection.updateOne(
+                { _id: new ObjectId(postId) },
+                { $push: { comments: commentData } }
+            );
+
+            const updatedPost = await postCollection.aggregate([
+                { $match: { _id: new ObjectId(postId) } },
+                {
+                    $lookup: {
+                        from: "users",
+                        let: { authorId: "$authorId" },
+                        pipeline: [
+                            { $match: { $expr: { $eq: ["$_id", "$$authorId"] } } },
+                            { $project: { name: 1, role: 1, department: 1, userImage: 1 } }
+                        ],
+                        as: "author"
+                    }
+                },
+                { $unwind: "$author" },
+
+                // lookup commenter info for each comment (only needed fields)
+                {
+                    $lookup: {
+                        from: "users",
+                        let: { commenterIds: "$comments.commenterId" },
+                        pipeline: [
+                            { $match: { $expr: { $in: ["$_id", "$$commenterIds"] } } },
+                            { $project: { name: 1, role: 1, department: 1, userImage: 1 } }
+                        ],
+                        as: "commenters"
+                    }
+                },
+
+                // merge commenter details back into each comment
+                {
+                    $addFields: {
+                        comments: {
+                            $map: {
+                                input: "$comments",
+                                as: "c",
+                                in: {
+                                    _id: "$$c._id",
+                                    comment: "$$c.comment",
+                                    createdAt: "$$c.createdAt",
+                                    commenter: {
+                                        $arrayElemAt: [
+                                            {
+                                                $filter: {
+                                                    input: "$commenters",
+                                                    as: "u",
+                                                    cond: { $eq: ["$$u._id", "$$c.commenterId"] }
+                                                }
+                                            },
+                                            0
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+
+                // project only required fields
+                {
+                    $project: {
+                        postContent: 1,
+                        createdAt: 1,
+                        author: 1,
+                        comments: 1
+                    }
+                }
+            ]).toArray();
+
+            res.send(updatedPost[0]);
+        })
+
 
         // ---------------------------------
         // ---------- connections ----------
         // ---------------------------------
 
         // get all received connection request
-        app.get('/connections/received/:id', async (req, res) => {
-            const { id } = req.params;
+        app.get('/connections/received/:connectionId', async (req, res) => {
+            const { connectionId } = req.params;
 
             const result = await connectionCollection.aggregate([
-                { $match: { to: new ObjectId(id), status: "pending" } },
+                { $match: { to: new ObjectId(connectionId), status: "pending" } },
 
                 {
                     $lookup: {
@@ -239,11 +329,11 @@ async function run() {
         })
 
         // get all sent connection request
-        app.get('/connections/sent/:id', async (req, res) => {
-            const { id } = req.params;
+        app.get('/connections/sent/:userId', async (req, res) => {
+            const { userId } = req.params;
 
             const result = await connectionCollection.aggregate([
-                { $match: { from: new ObjectId(id), status: "pending" } },
+                { $match: { from: new ObjectId(userId), status: "pending" } },
 
                 {
                     $lookup: {
@@ -272,15 +362,15 @@ async function run() {
         })
 
         // get all accepted connections
-        app.get('/connections/accepted/:id', async (req, res) => {
-            const { id } = req.params;
+        app.get('/connections/accepted/:userId', async (req, res) => {
+            const { userId } = req.params;
 
             const result = await connectionCollection.aggregate([
                 {
                     $match: {
                         $or: [
-                            { from: new ObjectId(id) },
-                            { to: new ObjectId(id) }
+                            { from: new ObjectId(userId) },
+                            { to: new ObjectId(userId) }
                         ],
                         status: "accepted"
                     }
@@ -289,7 +379,7 @@ async function run() {
                     $addFields: {
                         otherUserId: {
                             $cond: [
-                                { $eq: ["$from", new ObjectId(id)] },
+                                { $eq: ["$from", new ObjectId(userId)] },
                                 "$to",
                                 "$from"
                             ]
@@ -357,9 +447,9 @@ async function run() {
         });
 
         // for cancelling a connection request
-        app.delete('/connections/:id', async (req, res) => {
-            const { id } = req.params;
-            const result = await connectionCollection.deleteOne({ _id: new ObjectId(id) });
+        app.delete('/connections/:connectionId', async (req, res) => {
+            const { connectionId } = req.params;
+            const result = await connectionCollection.deleteOne({ _id: new ObjectId(connectionId) });
             res.send(result);
         })
 
