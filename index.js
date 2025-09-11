@@ -203,7 +203,7 @@ async function run() {
         })
 
         // patching a post for adding a comment
-        app.patch('/posts/comments/:postId', async (req, res) => {
+        app.patch('/posts/comments/add/:postId', async (req, res) => {
             const { postId } = req.params;
             const { commenterId, comment } = req.body;
 
@@ -217,6 +217,88 @@ async function run() {
             await postCollection.updateOne(
                 { _id: new ObjectId(postId) },
                 { $push: { comments: commentData } }
+            );
+
+            const updatedPost = await postCollection.aggregate([
+                { $match: { _id: new ObjectId(postId) } },
+                {
+                    $lookup: {
+                        from: "users",
+                        let: { authorId: "$authorId" },
+                        pipeline: [
+                            { $match: { $expr: { $eq: ["$_id", "$$authorId"] } } },
+                            { $project: { name: 1, role: 1, department: 1, userImage: 1 } }
+                        ],
+                        as: "author"
+                    }
+                },
+                { $unwind: "$author" },
+
+                // lookup commenter info for each comment (only needed fields)
+                {
+                    $lookup: {
+                        from: "users",
+                        let: { commenterIds: "$comments.commenterId" },
+                        pipeline: [
+                            { $match: { $expr: { $in: ["$_id", "$$commenterIds"] } } },
+                            { $project: { name: 1, role: 1, department: 1, userImage: 1 } }
+                        ],
+                        as: "commenters"
+                    }
+                },
+
+                // merge commenter details back into each comment
+                {
+                    $addFields: {
+                        comments: {
+                            $map: {
+                                input: "$comments",
+                                as: "c",
+                                in: {
+                                    _id: "$$c._id",
+                                    comment: "$$c.comment",
+                                    createdAt: "$$c.createdAt",
+                                    commenter: {
+                                        $arrayElemAt: [
+                                            {
+                                                $filter: {
+                                                    input: "$commenters",
+                                                    as: "u",
+                                                    cond: { $eq: ["$$u._id", "$$c.commenterId"] }
+                                                }
+                                            },
+                                            0
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+
+                // project only required fields
+                {
+                    $project: {
+                        postContent: 1,
+                        createdAt: 1,
+                        author: 1,
+                        comments: 1
+                    }
+                }
+            ]).toArray();
+
+            res.send(updatedPost[0]);
+        })
+
+
+        // patching a post for deleting a comment
+        app.patch('/posts/comments/delete/:postId', async (req, res) => {
+            const { postId } = req.params;
+            const { commentId } = req.body;
+
+            await postCollection.updateOne(
+                { _id: new ObjectId(postId) },
+                { $pull: { comments: { _id: new ObjectId(commentId) } } }
             );
 
             const updatedPost = await postCollection.aggregate([
