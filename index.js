@@ -187,6 +187,88 @@ async function run() {
         });
 
 
+        // get all posts from a specific author
+        app.get('/posts/author/:authorId', async (req, res) => {
+
+            const { authorId } = req.params;
+
+            const result = await postCollection.aggregate([
+                { $match: { authorId: new ObjectId(authorId) } },
+
+                // sort by createdAt descending (latest first)
+                { $sort: { createdAt: -1 } },
+
+                // lookup author info (only needed fields)
+                {
+                    $lookup: {
+                        from: "users",
+                        let: { authorId: "$authorId" },
+                        pipeline: [
+                            { $match: { $expr: { $eq: ["$_id", "$$authorId"] } } },
+                            { $project: { name: 1, role: 1, department: 1, userImage: 1 } }
+                        ],
+                        as: "author"
+                    }
+                },
+                { $unwind: "$author" },
+
+                // lookup commenter info for each comment (only needed fields)
+                {
+                    $lookup: {
+                        from: "users",
+                        let: { commenterIds: "$comments.commenterId" },
+                        pipeline: [
+                            { $match: { $expr: { $in: ["$_id", "$$commenterIds"] } } },
+                            { $project: { name: 1, role: 1, department: 1, userImage: 1 } }
+                        ],
+                        as: "commenters"
+                    }
+                },
+
+                // merge commenter details back into each comment
+                {
+                    $addFields: {
+                        comments: {
+                            $map: {
+                                input: "$comments",
+                                as: "c",
+                                in: {
+                                    _id: "$$c._id",
+                                    comment: "$$c.comment",
+                                    createdAt: "$$c.createdAt",
+                                    commenter: {
+                                        $arrayElemAt: [
+                                            {
+                                                $filter: {
+                                                    input: "$commenters",
+                                                    as: "u",
+                                                    cond: { $eq: ["$$u._id", "$$c.commenterId"] }
+                                                }
+                                            },
+                                            0
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+
+                // project only required fields
+                {
+                    $project: {
+                        postContent: 1,
+                        createdAt: 1,
+                        author: 1,
+                        comments: 1
+                    }
+                }
+            ]).toArray();
+
+            res.send(result);
+        })
+
+
         // insert a post
         app.post('/posts', async (req, res) => {
             const { authorId, postContent } = req.body;
@@ -200,6 +282,88 @@ async function run() {
 
             const result = await postCollection.insertOne(postData);
             res.send(result);
+        })
+
+
+        // update a post
+        app.patch('/posts/:postId', async (req, res) => {
+            const { postId } = req.params;
+            const { postContent } = req.body;
+
+            await postCollection.updateOne(
+                { _id: new ObjectId(postId) },
+                { $set: { postContent } }
+            );
+
+            const updatedPost = await postCollection.aggregate([
+                { $match: { _id: new ObjectId(postId) } },
+                {
+                    $lookup: {
+                        from: "users",
+                        let: { authorId: "$authorId" },
+                        pipeline: [
+                            { $match: { $expr: { $eq: ["$_id", "$$authorId"] } } },
+                            { $project: { name: 1, role: 1, department: 1, userImage: 1 } }
+                        ],
+                        as: "author"
+                    }
+                },
+                { $unwind: "$author" },
+
+                // lookup commenter info for each comment (only needed fields)
+                {
+                    $lookup: {
+                        from: "users",
+                        let: { commenterIds: "$comments.commenterId" },
+                        pipeline: [
+                            { $match: { $expr: { $in: ["$_id", "$$commenterIds"] } } },
+                            { $project: { name: 1, role: 1, department: 1, userImage: 1 } }
+                        ],
+                        as: "commenters"
+                    }
+                },
+
+                // merge commenter details back into each comment
+                {
+                    $addFields: {
+                        comments: {
+                            $map: {
+                                input: "$comments",
+                                as: "c",
+                                in: {
+                                    _id: "$$c._id",
+                                    comment: "$$c.comment",
+                                    createdAt: "$$c.createdAt",
+                                    commenter: {
+                                        $arrayElemAt: [
+                                            {
+                                                $filter: {
+                                                    input: "$commenters",
+                                                    as: "u",
+                                                    cond: { $eq: ["$$u._id", "$$c.commenterId"] }
+                                                }
+                                            },
+                                            0
+                                        ]
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+
+                // project only required fields
+                {
+                    $project: {
+                        postContent: 1,
+                        createdAt: 1,
+                        author: 1,
+                        comments: 1
+                    }
+                }
+            ]).toArray();
+
+            res.send(updatedPost[0]);
         })
 
         // patching a post for adding a comment
@@ -370,6 +534,14 @@ async function run() {
             ]).toArray();
 
             res.send(updatedPost[0]);
+        })
+
+
+        // for deleting a post
+        app.delete('/posts/:postId', async (req, res) => {
+            const { postId } = req.params;
+            const result = await postCollection.deleteOne({ _id: new ObjectId(postId) });
+            res.send(result);
         })
 
 
