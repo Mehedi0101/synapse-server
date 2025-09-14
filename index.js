@@ -28,9 +28,11 @@ async function run() {
         // Connect the client to the server	(optional starting in v4.7)
         await client.connect();
 
+        // ---------- collections ----------
         const userCollection = client.db("synapse").collection("users");
         const connectionCollection = client.db("synapse").collection("connections");
         const postCollection = client.db("synapse").collection("posts");
+        const jobCollection = client.db("synapse").collection("jobs");
 
         // ---------------------------
         // ---------- users ----------
@@ -704,6 +706,19 @@ async function run() {
         app.delete('/connections/:connectionId', async (req, res) => {
             const { connectionId } = req.params;
             const result = await connectionCollection.deleteOne({ _id: new ObjectId(connectionId) });
+            res.send(result);
+        })
+
+
+
+        // --------------------------
+        // ---------- jobs ----------
+        // --------------------------
+
+        // for inserting a job post
+        app.post('/jobs', async(req,res) => {
+            const job = req.body;
+            const result = await jobCollection.insertOne(job);
             res.send(result);
         })
 
