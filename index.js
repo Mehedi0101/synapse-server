@@ -48,8 +48,8 @@ async function run() {
         // get a user by id
         app.get('/users/:userId', async (req, res) => {
             const { userId } = req.params;
-            const result = await userCollection.findOne({ _id: new ObjectId(userId) });
-            res.send(result);
+            const user = await userCollection.findOne({ _id: new ObjectId(userId) });
+            res.send(user || null);
         })
 
 
@@ -715,9 +715,88 @@ async function run() {
         // ---------- jobs ----------
         // --------------------------
 
+        // for getting all jobs
+        app.get('/jobs', async (req, res) => {
+            const jobs = await jobCollection.find({},
+                {
+                    projection: {
+                        jobTitle: 1,
+                        jobType: 1,
+                        "company.name": 1,
+                        "company.logo": 1,
+                        "company.location": 1
+                    }
+                }
+            ).sort({ createdAt: -1 }).toArray();
+
+            res.send(jobs);
+        })
+
+        // for getting all jobs by a userId
+        app.get('/jobs/user/:userId', async (req, res) => {
+            const { userId } = req.params;
+            const jobs = await jobCollection
+                .find(
+                    { authorId: new ObjectId(userId) }, // match by current user's ID
+                    {
+                        projection: {
+                            jobTitle: 1,
+                            jobType: 1,
+                            "company.name": 1,
+                            "company.logo": 1,
+                            "company.location": 1
+                        }
+                    }
+                )
+                .sort({ createdAt: -1 }) // latest first
+                .toArray();
+
+            res.send(jobs);
+        })
+
+        // for getting job details
+        app.get('/jobs/:jobId', async (req, res) => {
+            const { jobId } = req.params;
+
+            const jobDetails = await jobCollection.aggregate([
+                { $match: { _id: new ObjectId(jobId) } },
+                {
+                    $lookup: {
+                        from: "users",
+                        localField: "authorId",
+                        foreignField: "_id",
+                        as: "author"
+                    }
+                },
+                { $unwind: "$author" },
+                {
+                    $project: {
+                        jobTitle: 1,
+                        jobType: 1,
+                        salary: 1,
+                        category: 1,
+                        description: 1,
+                        responsibility: 1,
+                        requirements: 1,
+                        applyLink: 1,
+                        createdAt: 1,
+                        company: 1,
+                        "author._id": 1,
+                        "author.name": 1,
+                        "author.userImage": 1,
+                        "author.department": 1,
+                    }
+                }
+            ]).toArray();
+
+            res.send(jobDetails[0] || null);
+        })
+
         // for inserting a job post
-        app.post('/jobs', async(req,res) => {
+        app.post('/jobs', async (req, res) => {
             const job = req.body;
+            job.authorId = new ObjectId(job.authorId);
+            job.createdAt = new Date();
             const result = await jobCollection.insertOne(job);
             res.send(result);
         })
