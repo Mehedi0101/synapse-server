@@ -715,22 +715,28 @@ async function run() {
         // ---------- jobs ----------
         // --------------------------
 
-        // for getting all jobs
-        app.get('/jobs', async (req, res) => {
-            const jobs = await jobCollection.find({},
+        // get all jobs except current user's
+        app.get('/jobs/:userId', async (req, res) => {
+            const { userId } = req.params;
+
+            const jobs = await jobCollection.find(
+                { authorId: { $ne: new ObjectId(userId) } }, // exclude current user's jobs
                 {
                     projection: {
                         jobTitle: 1,
                         jobType: 1,
                         "company.name": 1,
                         "company.logo": 1,
-                        "company.location": 1
+                        "company.location": 1,
+                        createdAt: 1
                     }
                 }
-            ).sort({ createdAt: -1 }).toArray();
+            )
+                .sort({ createdAt: -1 })
+                .toArray();
 
             res.send(jobs);
-        })
+        });
 
         // for getting all jobs by a userId
         app.get('/jobs/user/:userId', async (req, res) => {
@@ -755,7 +761,7 @@ async function run() {
         })
 
         // for getting job details
-        app.get('/jobs/:jobId', async (req, res) => {
+        app.get('/jobs/details/:jobId', async (req, res) => {
             const { jobId } = req.params;
 
             const jobDetails = await jobCollection.aggregate([
@@ -798,6 +804,30 @@ async function run() {
             job.authorId = new ObjectId(job.authorId);
             job.createdAt = new Date();
             const result = await jobCollection.insertOne(job);
+            res.send(result);
+        })
+
+
+        // for updating a job post
+        app.patch('/jobs/:jobId', async (req, res) => {
+            const { jobId } = req.params;
+            const jobData = req.body;
+            jobData.authorId = new ObjectId(jobData.authorId);
+
+            const result = await jobCollection.updateOne(
+                { _id: new ObjectId(jobId) },
+                {
+                    $set: jobData
+                }
+            )
+            res.send(result);
+        })
+
+
+        // for deleting a job post
+        app.delete('/jobs/:jobId', async (req, res) => {
+            const { jobId } = req.params;
+            const result = await jobCollection.deleteOne({ _id: new ObjectId(jobId) });
             res.send(result);
         })
 
