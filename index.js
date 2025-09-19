@@ -979,13 +979,40 @@ async function run() {
                         creatorId: 0,
                         creatorDetails: 0,
                         interestedUsers: 0,
-                        audience: 0,
                     }
                 }
             ]).toArray();
 
             res.send(events[0] || null);
         });
+
+
+        // for inserting an event
+        app.post('/events', async (req, res) => {
+            const event = req.body;
+            event.creatorId = new ObjectId(event.creatorId);
+            event.date = new Date(event.date);
+            event.interestedUsers = [];
+            const result = await eventCollection.insertOne(event);
+            res.send(result);
+        })
+
+
+        // for updating an event
+        app.patch('/events/:eventId', async (req, res) => {
+            const { eventId } = req.params;
+            const eventData = req.body;
+
+            eventData.date = new Date(eventData.date);
+
+            const result = await eventCollection.updateOne(
+                { _id: new ObjectId(eventId) },
+                {
+                    $set: eventData
+                }
+            )
+            res.send(result);
+        })
 
 
         // for updating interested user list
@@ -1068,13 +1095,10 @@ async function run() {
         })
 
 
-        // for inserting an event
-        app.post('/events', async (req, res) => {
-            const event = req.body;
-            event.creatorId = new ObjectId(event.creatorId);
-            event.date = new Date(event.date);
-            event.interestedUsers = [];
-            const result = await eventCollection.insertOne(event);
+        // for removing an event
+        app.delete('/events/:eventId', async (req, res) => {
+            const { eventId } = req.params;
+            const result = await eventCollection.deleteOne({ _id: new ObjectId(eventId) });
             res.send(result);
         })
 
