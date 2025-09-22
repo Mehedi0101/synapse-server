@@ -34,6 +34,7 @@ async function run() {
         const postCollection = client.db("synapse").collection("posts");
         const jobCollection = client.db("synapse").collection("jobs");
         const eventCollection = client.db("synapse").collection("events");
+        const resourceCollection = client.db("synapse").collection("resources");
 
         // ---------------------------
         // ---------- users ----------
@@ -1099,6 +1100,20 @@ async function run() {
         app.delete('/events/:eventId', async (req, res) => {
             const { eventId } = req.params;
             const result = await eventCollection.deleteOne({ _id: new ObjectId(eventId) });
+            res.send(result);
+        })
+
+
+
+        // -------------------------------
+        // ---------- resources ----------
+        // -------------------------------
+
+        // for inserting a resource
+        app.post('/resources', async (req, res) => {
+            const resource = req.body;
+            resource.createdAt = new Date();
+            const result = await resourceCollection.insertOne(resource);
             res.send(result);
         })
 
