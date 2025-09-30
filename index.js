@@ -116,6 +116,7 @@ async function run() {
 
         // get all post
         app.get("/posts", async (req, res) => {
+
             const result = await postCollection.aggregate([
                 // sort by createdAt descending (latest first)
                 { $sort: { createdAt: -1 } },
@@ -189,6 +190,7 @@ async function run() {
 
             res.send(result);
         });
+
 
 
         // get all posts from a specific author
@@ -717,6 +719,36 @@ async function run() {
         // ---------- jobs ----------
         // --------------------------
 
+        // get all jobs
+        app.get('/jobs', async (req, res) => {
+            const jobs = await jobCollection.aggregate([
+                {
+                    $lookup: {
+                        from: "users",
+                        localField: "authorId",
+                        foreignField: "_id",
+                        as: "author"
+                    }
+                },
+                { $unwind: "$author" },
+                {
+                    $project: {
+                        jobTitle: 1,
+                        jobType: 1,
+                        category: 1,
+                        createdAt: 1,
+                        "company.name": 1,
+                        "author._id": 1,
+                        "author.name": 1,
+                        "author.userImage": 1,
+                    }
+                }
+            ]).toArray();
+
+            res.send(jobs);
+        })
+
+
         // get all jobs except current user's posted jobs
         app.get('/jobs/:userId', async (req, res) => {
             const { userId } = req.params;
@@ -765,7 +797,6 @@ async function run() {
         // for getting job details
         app.get('/jobs/details/:jobId', async (req, res) => {
             const { jobId } = req.params;
-
             const jobDetails = await jobCollection.aggregate([
                 { $match: { _id: new ObjectId(jobId) } },
                 {
@@ -1229,7 +1260,7 @@ async function run() {
             updatedResource._id = new ObjectId(updatedResource._id);
             updatedResource.date = new Date(updatedResource.date);
             updatedResource.authorId = new ObjectId(updatedResource.authorId);
-            
+
             const result = await resourceCollection.updateOne(
                 { _id: new ObjectId(resourceId) },
                 {
