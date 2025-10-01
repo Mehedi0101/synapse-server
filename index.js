@@ -914,7 +914,7 @@ async function run() {
 
             res.send(events); // return all events, not just one
         })
-        
+
 
         // Get all events created by a user
         app.get('/events/user/:userId', async (req, res) => {
@@ -1185,6 +1185,35 @@ async function run() {
         // -------------------------------
         // ---------- resources ----------
         // -------------------------------
+
+        // get all resources
+        app.get('/resources', async (req, res) => {
+
+            const resources = await resourceCollection.aggregate([
+                {
+                    $lookup: {
+                        from: "users",
+                        localField: "authorId",
+                        foreignField: "_id",
+                        as: "authorDetails"
+                    }
+                },
+                { $unwind: { path: "$authorDetails", preserveNullAndEmptyArrays: true } },
+                {
+                    $addFields: {
+                        author: {
+                            _id: "$authorDetails._id",
+                            name: "$authorDetails.name",
+                            userImage: "$authorDetails.userImage",
+                        }
+                    }
+                },
+                { $project: { authorDetails: 0 } },
+                { $sort: { createdAt: 1 } }
+            ]).toArray();
+
+            res.send(resources);
+        })
 
         // all resources contributed by a user
         app.get('/resources/my/:userId', async (req, res) => {
