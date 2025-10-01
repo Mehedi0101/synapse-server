@@ -870,6 +870,52 @@ async function run() {
         // ---------- events ----------
         // ----------------------------
 
+        // Get all events
+        app.get('/events', async (req, res) => {
+
+            const events = await eventCollection.aggregate([
+                {
+                    $lookup: {
+                        from: "users",
+                        localField: "creatorId",
+                        foreignField: "_id",
+                        as: "creatorDetails"
+                    }
+                },
+                {
+                    $unwind: {
+                        path: "$creatorDetails",
+                        preserveNullAndEmptyArrays: true
+                    }
+                },
+                {
+                    $addFields: {
+                        creator: {
+                            _id: "$creatorDetails._id",
+                            name: "$creatorDetails.name",
+                            userImage: "$creatorDetails.userImage",
+                        },
+                        interestedCount: { $size: { $ifNull: ["$interestedUsers", []] } },
+                    }
+                },
+                {
+                    $project: {
+                        title: 1,
+                        creator: 1,
+                        type: 1,
+                        date: 1,
+                        timeRange: 1,
+                        interestedCount: 1,
+                        createdAt: 1,
+                    }
+                },
+                { $sort: { createdAt: -1 } } // newest first
+            ]).toArray();
+
+            res.send(events); // return all events, not just one
+        })
+        
+
         // Get all events created by a user
         app.get('/events/user/:userId', async (req, res) => {
             const { userId } = req.params;
