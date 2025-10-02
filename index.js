@@ -32,6 +32,7 @@ async function run() {
         const userCollection = client.db("synapse").collection("users");
         const connectionCollection = client.db("synapse").collection("connections");
         const postCollection = client.db("synapse").collection("posts");
+        const mentorshipCollection = client.db("synapse").collection("mentorship");
         const jobCollection = client.db("synapse").collection("jobs");
         const eventCollection = client.db("synapse").collection("events");
         const resourceCollection = client.db("synapse").collection("resources");
@@ -42,7 +43,7 @@ async function run() {
 
         // get all users
         app.get('/users', async (req, res) => {
-            const result = await userCollection.find({}, { projection: { name: 1, department: 1, role: 1, userImage: 1 } }).toArray();
+            const result = await userCollection.find({}, { projection: { name: 1, department: 1, role: 1, userImage: 1, email: 1 } }).sort({ role: 1 }).toArray();
             res.send(result);
         })
 
@@ -710,6 +711,59 @@ async function run() {
         app.delete('/connections/:connectionId', async (req, res) => {
             const { connectionId } = req.params;
             const result = await connectionCollection.deleteOne({ _id: new ObjectId(connectionId) });
+            res.send(result);
+        })
+
+
+
+        // --------------------------------
+        // ---------- mentorship ----------
+        // --------------------------------
+
+        // get mentorship request based on the studentId
+        app.get('/mentorship/student/:studentId', async (req, res) => {
+            const { studentId } = req.params;
+            // const data = await mentorshipCollection.findOne({ studentId: new ObjectId(studentId) });
+            const data = await mentorshipCollection.aggregate([
+                {
+                    $match: {
+                        studentId: new ObjectId(studentId)
+                    }
+                },
+                {
+                    $lookup: {
+                        from: "users",
+                        localField: "mentorId",
+                        foreignField: "_id",
+                        as: "mentor"
+                    }
+                },
+                { $unwind: "$mentor" },
+                {
+                    $project: {
+                        _id: 1,          // connection ID (for delete action)
+                        studentId: 1,
+                        goal: 1,
+                        description: 1,
+                        status: 1,
+                        createdAt: 1,
+                        "mentor._id": 1,
+                        "mentor.name": 1,
+                    }
+                }
+            ]).toArray();
+            res.send(data[0] || null);
+        })
+
+        // insert a mentorship request in the database
+        app.post('/mentorship', async (req, res) => {
+            const request = req.body;
+            request.studentId = new ObjectId(request?.studentId);
+            request.mentorId = new ObjectId(request?.mentorId);
+            request.status = "pending";
+            request.createdAt = new Date();
+
+            const result = await mentorshipCollection.insertOne(request);
             res.send(result);
         })
 
