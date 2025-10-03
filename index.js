@@ -720,10 +720,125 @@ async function run() {
         // ---------- mentorship ----------
         // --------------------------------
 
+        // get all mentorship request
+        app.get('/mentorship', async (req, res) => {
+            const data = await mentorshipCollection.aggregate([
+                {
+                    $lookup: {
+                        from: "users",
+                        localField: "mentorId",
+                        foreignField: "_id",
+                        as: "mentor"
+                    }
+                },
+                { $unwind: "$mentor" },
+                {
+                    $lookup: {
+                        from: "users",
+                        localField: "studentId",
+                        foreignField: "_id",
+                        as: "student"
+                    }
+                },
+                { $unwind: "$student" },
+                {
+                    $project: {
+                        _id: 1,
+                        goal: 1,
+                        description: 1,
+                        status: 1,
+                        createdAt: 1,
+                        "mentor._id": 1,
+                        "mentor.name": 1,
+                        "mentor.userImage": 1,
+                        "student._id": 1,
+                        "student.name": 1,
+                        "student.userImage": 1,
+                    }
+                }
+            ]).toArray();
+
+            res.send(data);
+        });
+
+
+        // get mentorship request details
+        app.get('/mentorship/:id', async (req, res) => {
+            const { id } = req.params;
+
+            const data = await mentorshipCollection.aggregate([
+                {
+                    $match: { _id: new ObjectId(id) }
+                },
+                {
+                    $lookup: {
+                        from: "users",
+                        localField: "mentorId",
+                        foreignField: "_id",
+                        as: "mentor"
+                    }
+                },
+                { $unwind: "$mentor" },
+                {
+                    $lookup: {
+                        from: "users",
+                        localField: "studentId",
+                        foreignField: "_id",
+                        as: "student"
+                    }
+                },
+                { $unwind: "$student" },
+
+                // -------- lookup accepted mentorships of this mentor --------
+                {
+                    $lookup: {
+                        from: "mentorships", // collection name
+                        let: { mentorId: "$mentorId" },
+                        pipeline: [
+                            {
+                                $match: {
+                                    $expr: {
+                                        $and: [
+                                            { $eq: ["$mentorId", "$$mentorId"] },
+                                            { $eq: ["$status", "accepted"] }
+                                        ]
+                                    }
+                                }
+                            }
+                        ],
+                        as: "acceptedMentorships"
+                    }
+                },
+                {
+                    $addFields: {
+                        mentorAcceptedCount: { $size: "$acceptedMentorships" }
+                    }
+                },
+                {
+                    $project: {
+                        _id: 1,
+                        goal: 1,
+                        description: 1,
+                        status: 1,
+                        createdAt: 1,
+                        "mentor._id": 1,
+                        "mentor.name": 1,
+                        "mentor.userImage": 1,
+                        "student._id": 1,
+                        "student.name": 1,
+                        "student.userImage": 1,
+                        mentorAcceptedCount: 1
+                    }
+                }
+            ]).toArray();
+
+            res.send(data[0] || null);
+        });
+
+
         // get mentorship request based on the studentId
         app.get('/mentorship/student/:studentId', async (req, res) => {
             const { studentId } = req.params;
-            // const data = await mentorshipCollection.findOne({ studentId: new ObjectId(studentId) });
             const data = await mentorshipCollection.aggregate([
                 {
                     $match: {
@@ -755,6 +870,44 @@ async function run() {
             res.send(data[0] || null);
         })
 
+
+        // get mentorship request based on the mentorId
+        app.get('/mentorship/mentor/:mentorId', async (req, res) => {
+            const { mentorId } = req.params;
+            const data = await mentorshipCollection.aggregate([
+                {
+                    $match: {
+                        mentorId: new ObjectId(mentorId),
+                        status: { $nin: ["pending", "rejected"] }
+                    }
+                },
+                {
+                    $lookup: {
+                        from: "users",
+                        localField: "studentId",
+                        foreignField: "_id",
+                        as: "student"
+                    }
+                },
+                { $unwind: "$student" },
+                {
+                    $project: {
+                        _id: 1,          // connection ID (for delete action)
+                        mentorId: 1,
+                        goal: 1,
+                        description: 1,
+                        status: 1,
+                        createdAt: 1,
+                        "student._id": 1,
+                        "student.name": 1,
+                        "student.userImage": 1,
+                    }
+                }
+            ]).toArray();
+            res.send(data);
+        })
+
+
         // insert a mentorship request in the database
         app.post('/mentorship', async (req, res) => {
             const request = req.body;
@@ -766,6 +919,38 @@ async function run() {
             const result = await mentorshipCollection.insertOne(request);
             res.send(result);
         })
+
+
+        // Update mentorship status
+        app.patch('/mentorship/:id', async (req, res) => {
+            const { id } = req.params;
+            const { status, steps } = req.body;
+
+            const updateFields = { status };
+
+            // If status is "accepted", also include steps
+            if (status === "accepted" && Array.isArray(steps)) {
+                updateFields.steps = steps;
+            }
+
+            const result = await mentorshipCollection.updateOne(
+                { _id: new ObjectId(id) },
+                { $set: updateFields }
+            );
+
+            res.send(result);
+        });
+
+
+        // Delete mentorship request
+        app.delete('/mentorship/:id', async (req, res) => {
+            const { id } = req.params;
+
+            const result = await mentorshipCollection.deleteOne({ _id: new ObjectId(id) });
+
+            res.send(result);
+        });
+
 
 
 
