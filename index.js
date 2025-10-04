@@ -821,6 +821,8 @@ async function run() {
                         description: 1,
                         status: 1,
                         createdAt: 1,
+                        steps: 1,
+                        currentStep: 1,
                         "mentor._id": 1,
                         "mentor.name": 1,
                         "mentor.userImage": 1,
@@ -842,7 +844,8 @@ async function run() {
             const data = await mentorshipCollection.aggregate([
                 {
                     $match: {
-                        studentId: new ObjectId(studentId)
+                        studentId: new ObjectId(studentId),
+                        status: { $in: ["assigned", "accepted", "pending"] }
                     }
                 },
                 {
@@ -862,8 +865,11 @@ async function run() {
                         description: 1,
                         status: 1,
                         createdAt: 1,
+                        steps: 1,
+                        currentStep: 1,
                         "mentor._id": 1,
                         "mentor.name": 1,
+                        "mentor.userImage": 1,
                     }
                 }
             ]).toArray();
@@ -878,7 +884,7 @@ async function run() {
                 {
                     $match: {
                         mentorId: new ObjectId(mentorId),
-                        status: { $nin: ["pending", "rejected"] }
+                        status: { $in: ["assigned", "accepted"] }
                     }
                 },
                 {
@@ -898,6 +904,8 @@ async function run() {
                         description: 1,
                         status: 1,
                         createdAt: 1,
+                        steps: 1,
+                        currentStep: 1,
                         "student._id": 1,
                         "student.name": 1,
                         "student.userImage": 1,
@@ -924,14 +932,12 @@ async function run() {
         // Update mentorship status
         app.patch('/mentorship/:id', async (req, res) => {
             const { id } = req.params;
-            const { status, steps } = req.body;
 
-            const updateFields = { status };
+            const updateFields = {};
 
-            // If status is "accepted", also include steps
-            if (status === "accepted" && Array.isArray(steps)) {
-                updateFields.steps = steps;
-            }
+            if (req?.body?.status) updateFields.status = req.body.status;
+            if (req?.body?.steps) updateFields.steps = req.body.steps;
+            if (req?.body?.currentStep) updateFields.currentStep = req.body.currentStep;
 
             const result = await mentorshipCollection.updateOne(
                 { _id: new ObjectId(id) },
