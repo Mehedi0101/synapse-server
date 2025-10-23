@@ -37,7 +37,8 @@ async function run() {
         const eventCollection = client.db("synapse").collection("events");
         const resourceCollection = client.db("synapse").collection("resources");
         const chatInfoCollection = client.db("synapse").collection("chatInfo");
-        const messageCollection = client.db("synapse").collection("message");
+        const messageCollection = client.db("synapse").collection("messages");
+        const notificationCollection = client.db("synapse").collection("notifications");
 
         // ---------------------------
         // ---------- users ----------
@@ -380,91 +381,114 @@ async function run() {
 
         // patching a post for adding a comment
         app.patch('/posts/comments/add/:postId', async (req, res) => {
-            const { postId } = req.params;
-            const { commenterId, comment } = req.body;
+            try {
+                const { postId } = req.params;
+                const { commenterId, comment } = req.body;
 
-            const commentData = {
-                _id: new ObjectId(),
-                commenterId: new ObjectId(commenterId),
-                comment,
-                createdAt: new Date()
-            };
+                const commentData = {
+                    _id: new ObjectId(),
+                    commenterId: new ObjectId(commenterId),
+                    comment,
+                    createdAt: new Date()
+                };
 
-            await postCollection.updateOne(
-                { _id: new ObjectId(postId) },
-                { $push: { comments: commentData } }
-            );
+                // Add the comment to post
+                await postCollection.updateOne(
+                    { _id: new ObjectId(postId) },
+                    { $push: { comments: commentData } }
+                );
 
-            const updatedPost = await postCollection.aggregate([
-                { $match: { _id: new ObjectId(postId) } },
-                {
-                    $lookup: {
-                        from: "users",
-                        let: { authorId: "$authorId" },
-                        pipeline: [
-                            { $match: { $expr: { $eq: ["$_id", "$$authorId"] } } },
-                            { $project: { name: 1, role: 1, department: 1, userImage: 1 } }
-                        ],
-                        as: "author"
+                // Fetch post info for author
+                const post = await postCollection.findOne(
+                    { _id: new ObjectId(postId) },
+                    { projection: { authorId: 1 } }
+                );
+
+                // Fetch commenter name for notification
+                if (post && String(post.authorId) !== commenterId) {
+                    const commenter = await userCollection.findOne(
+                        { _id: new ObjectId(commenterId) },
+                        { projection: { name: 1 } }
+                    );
+
+                    if (commenter) {
+                        await notificationCollection.insertOne({
+                            userId: new ObjectId(post.authorId),
+                            message: `${commenter.name} has commented on your post.`,
+                            createdAt: new Date()
+                        });
                     }
-                },
-                { $unwind: "$author" },
+                }
 
-                // lookup commenter info for each comment (only needed fields)
-                {
-                    $lookup: {
-                        from: "users",
-                        let: { commenterIds: "$comments.commenterId" },
-                        pipeline: [
-                            { $match: { $expr: { $in: ["$_id", "$$commenterIds"] } } },
-                            { $project: { name: 1, role: 1, department: 1, userImage: 1 } }
-                        ],
-                        as: "commenters"
-                    }
-                },
-
-                // merge commenter details back into each comment
-                {
-                    $addFields: {
-                        comments: {
-                            $map: {
-                                input: "$comments",
-                                as: "c",
-                                in: {
-                                    _id: "$$c._id",
-                                    comment: "$$c.comment",
-                                    createdAt: "$$c.createdAt",
-                                    commenter: {
-                                        $arrayElemAt: [
-                                            {
-                                                $filter: {
-                                                    input: "$commenters",
-                                                    as: "u",
-                                                    cond: { $eq: ["$$u._id", "$$c.commenterId"] }
-                                                }
-                                            },
-                                            0
-                                        ]
+                // Rebuild the post with commenter details for frontend
+                const updatedPost = await postCollection.aggregate([
+                    { $match: { _id: new ObjectId(postId) } },
+                    {
+                        $lookup: {
+                            from: "users",
+                            let: { authorId: "$authorId" },
+                            pipeline: [
+                                { $match: { $expr: { $eq: ["$_id", "$$authorId"] } } },
+                                { $project: { name: 1, role: 1, department: 1, userImage: 1 } }
+                            ],
+                            as: "author"
+                        }
+                    },
+                    { $unwind: "$author" },
+                    {
+                        $lookup: {
+                            from: "users",
+                            let: { commenterIds: "$comments.commenterId" },
+                            pipeline: [
+                                { $match: { $expr: { $in: ["$_id", "$$commenterIds"] } } },
+                                { $project: { name: 1, role: 1, department: 1, userImage: 1 } }
+                            ],
+                            as: "commenters"
+                        }
+                    },
+                    {
+                        $addFields: {
+                            comments: {
+                                $map: {
+                                    input: "$comments",
+                                    as: "c",
+                                    in: {
+                                        _id: "$$c._id",
+                                        comment: "$$c.comment",
+                                        createdAt: "$$c.createdAt",
+                                        commenter: {
+                                            $arrayElemAt: [
+                                                {
+                                                    $filter: {
+                                                        input: "$commenters",
+                                                        as: "u",
+                                                        cond: { $eq: ["$$u._id", "$$c.commenterId"] }
+                                                    }
+                                                },
+                                                0
+                                            ]
+                                        }
                                     }
                                 }
                             }
                         }
+                    },
+                    {
+                        $project: {
+                            postContent: 1,
+                            createdAt: 1,
+                            author: 1,
+                            comments: 1
+                        }
                     }
-                },
+                ]).toArray();
 
-                // project only required fields
-                {
-                    $project: {
-                        postContent: 1,
-                        createdAt: 1,
-                        author: 1,
-                        comments: 1
-                    }
-                }
-            ]).toArray();
-
-            res.send(updatedPost[0]);
-        })
+                res.send(updatedPost[0]);
+            } catch (error) {
+                console.error("Error adding comment:", error);
+                res.status(500).send({ success: false, error: "Internal server error" });
+            }
+        });
 
 
         // patching a post for deleting a comment
@@ -884,25 +908,45 @@ async function run() {
 
         // insert a connection request
         app.post('/connections', async (req, res) => {
-            const { from, to, status } = req.body;
-            const existing = await connectionCollection.findOne({
-                $or: [
-                    { from: new ObjectId(from), to: new ObjectId(to) },
-                    { from: new ObjectId(to), to: new ObjectId(from) }
-                ]
-            });
-            if (existing) {
-                return res.send({ acknowledged: "true" });
+            try {
+                const { from, to, status } = req.body;
+
+                const existing = await connectionCollection.findOne({
+                    $or: [
+                        { from: new ObjectId(from), to: new ObjectId(to) },
+                        { from: new ObjectId(to), to: new ObjectId(from) }
+                    ]
+                });
+
+                if (existing) {
+                    return res.send({ acknowledged: true });
+                }
+
+                // Insert connection request
+                const data = {
+                    from: new ObjectId(from),
+                    to: new ObjectId(to),
+                    status,
+                    createdAt: new Date()
+                };
+                const result = await connectionCollection.insertOne(data);
+
+                // ---------- Create notification ----------
+                const sender = await userCollection.findOne({ _id: new ObjectId(from) });
+                if (sender) {
+                    await notificationCollection.insertOne({
+                        userId: new ObjectId(to),
+                        message: `${sender.name} has sent you a connection request.`,
+                        createdAt: new Date()
+                    });
+                }
+
+                res.send(result);
+            } catch (error) {
+                console.error("Error creating connection request:", error);
+                res.status(500).send({ success: false, error: "Internal server error" });
             }
-            const data = {
-                from: new ObjectId(from),
-                to: new ObjectId(to),
-                status,
-                createdAt: new Date()
-            }
-            const result = await connectionCollection.insertOne(data);
-            res.send(result);
-        })
+        });
 
         // for accepting a connection request
         app.patch('/connections/accept', async (req, res) => {
@@ -1807,6 +1851,69 @@ async function run() {
             res.send(result);
         })
 
+
+
+        // -----------------------------------
+        // ---------- notifications ----------
+        // -----------------------------------
+
+        // Get all notifications for a user
+        app.get("/notifications/:userId", async (req, res) => {
+            try {
+                const { userId } = req.params;
+
+                const notifications = await notificationCollection
+                    .find({ userId: new ObjectId(userId) })
+                    .sort({ createdAt: -1 })
+                    .toArray();
+
+                res.send(notifications);
+            } catch (error) {
+                console.error("Error fetching notifications:", error);
+                res.status(500).send({ success: false, error: "Internal Server Error" });
+            }
+        });
+
+
+        // Insert a new notification
+        app.post("/notifications", async (req, res) => {
+            try {
+                const { userId, message } = req.body;
+
+                if (!userId || !message) {
+                    return res.status(400).send({ success: false, error: "Missing fields" });
+                }
+
+                const newNotification = {
+                    userId: new ObjectId(userId),
+                    message,
+                    createdAt: new Date(),
+                };
+
+                const result = await notificationCollection.insertOne(newNotification);
+                res.send({ success: true, insertedId: result.insertedId });
+            } catch (error) {
+                console.error("Error inserting notification:", error);
+                res.status(500).send({ success: false, error: "Internal Server Error" });
+            }
+        });
+
+
+        // Delete all notifications for a user
+        app.delete("/notifications/:userId", async (req, res) => {
+            try {
+                const { userId } = req.params;
+
+                const result = await notificationCollection.deleteMany({
+                    userId: new ObjectId(userId),
+                });
+
+                res.send({ success: true, deletedCount: result.deletedCount });
+            } catch (error) {
+                console.error("Error deleting notifications:", error);
+                res.status(500).send({ success: false, error: "Internal Server Error" });
+            }
+        });
 
 
         // ------------------------------------
