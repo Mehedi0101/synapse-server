@@ -65,7 +65,7 @@ async function run() {
 
 
         // ---------- mentorship routes ---------------
-        app.use('/mentorship', createMentorshipsRoutes(mentorshipCollection));
+        app.use('/mentorship', createMentorshipsRoutes(mentorshipCollection, userCollection, notificationCollection));
 
 
         // ---------- job routes ----------

@@ -2,7 +2,7 @@
 const express = require('express');
 const { ObjectId } = require('mongodb');
 
-function createMentorshipsRoutes(mentorshipCollection) {
+function createMentorshipsRoutes(mentorshipCollection, userCollection, notificationCollection) {
     const router = express.Router();
 
     // get all mentorship request
@@ -215,21 +215,114 @@ function createMentorshipsRoutes(mentorshipCollection) {
 
 
     // Update mentorship status
-    router.patch('/:id', async (req, res) => {
-        const { id } = req.params;
+    // router.patch('/:id', async (req, res) => {
+    //     const { id } = req.params;
 
-        const updateFields = {};
+    //     const updateFields = {};
 
-        if (req?.body?.status) updateFields.status = req.body.status;
-        if (req?.body?.steps) updateFields.steps = req.body.steps;
-        if (req?.body?.currentStep) updateFields.currentStep = req.body.currentStep;
+    //     if (req?.body?.status) updateFields.status = req.body.status;
+    //     if (req?.body?.steps) updateFields.steps = req.body.steps;
+    //     if (req?.body?.currentStep) updateFields.currentStep = req.body.currentStep;
 
-        const result = await mentorshipCollection.updateOne(
-            { _id: new ObjectId(id) },
-            { $set: updateFields }
-        );
+    //     const result = await mentorshipCollection.updateOne(
+    //         { _id: new ObjectId(id) },
+    //         { $set: updateFields }
+    //     );
 
-        res.send(result);
+    //     res.send(result);
+    // });
+
+    router.patch("/:id", async (req, res) => {
+        try {
+            const { id } = req.params;
+            const { status, steps, currentStep } = req.body;
+
+            const updateFields = {};
+            if (status) updateFields.status = status;
+            if (steps) updateFields.steps = steps;
+            if (currentStep) updateFields.currentStep = currentStep;
+
+            // ---------- Update Mentorship ----------
+            const result = await mentorshipCollection.updateOne(
+                { _id: new ObjectId(id) },
+                { $set: updateFields }
+            );
+
+            // ---------- Fetch Mentorship Info ----------
+            const mentorship = await mentorshipCollection.findOne({ _id: new ObjectId(id) });
+            if (!mentorship) {
+                return res.status(404).send({ success: false, message: "Mentorship not found" });
+            }
+
+            // ---------- Fetch related users ----------
+            const student = await userCollection.findOne({ _id: new ObjectId(mentorship.studentId) });
+            const alumni = await userCollection.findOne({ _id: new ObjectId(mentorship.mentorId) });
+
+            // ---------- Create Notification ----------
+            let notification = null;
+
+            if (status) {
+                switch (status) {
+                    case "assigned":
+                        // Notify the alumni that a mentorship has been assigned
+                        notification = {
+                            userId: mentorship.mentorId,
+                            message: `${student?.name || "A student"} has requested mentorship from you.`,
+                            createdAt: new Date(),
+                        };
+                        break;
+
+                    case "accepted":
+                        // Notify student that mentorship request was accepted
+                        notification = {
+                            userId: mentorship.studentId,
+                            message: `${alumni?.name || "The alumni"} has accepted your mentorship request.`,
+                            createdAt: new Date(),
+                        };
+                        break;
+
+                    case "rejected":
+                        // Notify student that mentorship request was rejected
+                        notification = {
+                            userId: mentorship.studentId,
+                            message: `${alumni?.name || "The alumni"} is unable to accept your mentorship request at this time.`,
+                            createdAt: new Date(),
+                        };
+                        break;
+
+                    case "cancelled":
+                        // Notify student that mentorship was cancelled
+                        notification = {
+                            userId: mentorship.studentId,
+                            message: `Your mentorship with ${alumni?.name || "the alumni"} has been cancelled.`,
+                            createdAt: new Date(),
+                        };
+                        break;
+
+                    case "completed":
+                        // Notify student that mentorship is marked as completed
+                        notification = {
+                            userId: mentorship.studentId,
+                            message: `Your mentorship with ${alumni?.name || "the alumni"} has been marked as completed.`,
+                            createdAt: new Date(),
+                        };
+                        break;
+
+                    default:
+                        break;
+                }
+
+                // Insert notification only if created
+                if (notification) {
+                    await notificationCollection.insertOne(notification);
+                }
+            }
+
+            res.send(result);
+        } catch (error) {
+            console.error("Error updating mentorship:", error);
+            res.status(500).send({ success: false, message: "Internal server error" });
+        }
     });
 
 
