@@ -165,15 +165,43 @@ function createConnectionsRoutes(connectionCollection, userCollection, notificat
     });
 
     // for accepting a connection request
-    router.patch('/accept', async (req, res) => {
-        const { id } = req.body;
+    router.patch("/accept", async (req, res) => {
+        try {
+            const { id } = req.body;
 
-        const result = await connectionCollection.updateOne(
-            { _id: new ObjectId(id) },
-            { $set: { status: "accepted" } }
-        );
+            // ---------- Find the connection first ----------
+            const connection = await connectionCollection.findOne({ _id: new ObjectId(id) });
+            if (!connection) {
+                return res.status(404).send({ success: false, message: "Connection not found" });
+            }
 
-        res.send(result);
+            // ---------- Update connection status ----------
+            const result = await connectionCollection.updateOne(
+                { _id: new ObjectId(id) },
+                { $set: { status: "accepted" } }
+            );
+
+            const sender = await userCollection.findOne({ _id: new ObjectId(connection.from) });
+            const receiver = await userCollection.findOne({ _id: new ObjectId(connection.to) });
+
+            // ---------- Create notification ----------
+            if (receiver && sender) {
+                const message = `${receiver.name} has accepted your connection request.`;
+
+                const notification = {
+                    userId: connection.from, // send to the original requester
+                    message,
+                    createdAt: new Date(),
+                };
+
+                await notificationCollection.insertOne(notification);
+            }
+
+            res.send(result);
+        } catch (error) {
+            console.error("Error accepting connection:", error);
+            res.status(500).send({ success: false, message: "Internal server error" });
+        }
     });
 
     // for cancelling a connection request
