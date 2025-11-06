@@ -74,6 +74,13 @@ function createUsersRoutes(userCollection, connectionCollection) {
         res.send(result);
     });
 
+    // delete a user
+    router.delete('/:userId', async (req, res) => {
+        const { userId } = req.params;
+        const result = await userCollection.deleteOne({ _id: new ObjectId(userId) });
+        res.send(result);
+    })
+
     return router;
 }
 
