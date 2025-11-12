@@ -106,6 +106,7 @@ function createJobsRoutes(jobCollection) {
                     routerlyLink: 1,
                     createdAt: 1,
                     company: 1,
+                    applyLink: 1,
                     "author._id": 1,
                     "author.name": 1,
                     "author.userImage": 1,

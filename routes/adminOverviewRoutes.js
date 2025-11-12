@@ -49,7 +49,11 @@ function createAdminOverviewsRoutes(userCollection, eventCollection, jobCollecti
         // ---------- Top mentors by accepted mentorships ----------
         const topMentors = await mentorshipCollection
             .aggregate([
-                { $match: { status: "accepted" } },
+                {
+                    $match: {
+                        status: { $in: ["accepted", "completed"] }
+                    }
+                },
                 { $group: { _id: "$mentorId", mentorships: { $sum: 1 } } },
                 { $sort: { mentorships: -1 } },
                 { $limit: 5 },
