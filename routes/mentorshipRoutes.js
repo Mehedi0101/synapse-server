@@ -213,25 +213,6 @@ function createMentorshipsRoutes(mentorshipCollection, userCollection, notificat
         res.send(result);
     })
 
-
-    // Update mentorship status
-    // router.patch('/:id', async (req, res) => {
-    //     const { id } = req.params;
-
-    //     const updateFields = {};
-
-    //     if (req?.body?.status) updateFields.status = req.body.status;
-    //     if (req?.body?.steps) updateFields.steps = req.body.steps;
-    //     if (req?.body?.currentStep) updateFields.currentStep = req.body.currentStep;
-
-    //     const result = await mentorshipCollection.updateOne(
-    //         { _id: new ObjectId(id) },
-    //         { $set: updateFields }
-    //     );
-
-    //     res.send(result);
-    // });
-
     router.patch("/:id", async (req, res) => {
         try {
             const { id } = req.params;
