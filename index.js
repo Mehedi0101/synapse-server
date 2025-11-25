@@ -5,6 +5,7 @@ const cors = require('cors');
 const { connectDB } = require('./db');
 // const cookieParser = require('cookie-parser');
 const verifyToken = require('./middlewares/verifyToken');
+const verifyOwnership = require('./middlewares/verifyOwnership');
 
 const createUsersRoutes = require('./routes/userRoutes');
 const createPostsRoutes = require('./routes/postRoutes');
@@ -55,7 +56,7 @@ async function run() {
 
 
         // ---------- post routes ----------
-        app.use('/posts', createPostsRoutes(postCollection, userCollection, notificationCollection, verifyToken));
+        app.use('/posts', createPostsRoutes(postCollection, userCollection, notificationCollection, verifyToken, verifyOwnership));
 
 
         // ---------- chat info routes --------------

@@ -2,7 +2,7 @@
 const express = require('express');
 const { ObjectId } = require('mongodb');
 
-function createPostsRoutes(postCollection, userCollection, notificationCollection, verifyToken) {
+function createPostsRoutes(postCollection, userCollection, notificationCollection, verifyToken, verifyOwnership) {
     const router = express.Router();
 
     // ---------------------------
@@ -89,7 +89,7 @@ function createPostsRoutes(postCollection, userCollection, notificationCollectio
 
 
     // get all posts from a specific author
-    router.get('/author/:authorId', async (req, res) => {
+    router.get('/author/:authorId', verifyToken, verifyOwnership, async (req, res) => {
 
         const { authorId } = req.params;
 
