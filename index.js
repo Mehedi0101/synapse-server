@@ -3,6 +3,8 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const { connectDB } = require('./db');
+// const cookieParser = require('cookie-parser');
+const verifyToken = require('./middlewares/verifyToken');
 
 const createUsersRoutes = require('./routes/userRoutes');
 const createPostsRoutes = require('./routes/postRoutes');
@@ -21,8 +23,12 @@ const port = process.env.PORT || 5000;
 
 // ---------- initial setup ----------
 const app = express();
-app.use(cors());
+app.use(cors({
+    origin: ['http://localhost:5173', 'https://synapse-0101.web.app'],
+    credentials: true
+}));
 app.use(express.json());
+// app.use(cookieParser());
 
 
 async function run() {
@@ -49,7 +55,7 @@ async function run() {
 
 
         // ---------- post routes ----------
-        app.use('/posts', createPostsRoutes(postCollection, userCollection, notificationCollection));
+        app.use('/posts', createPostsRoutes(postCollection, userCollection, notificationCollection, verifyToken));
 
 
         // ---------- chat info routes --------------

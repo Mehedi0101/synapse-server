@@ -2,7 +2,7 @@
 const express = require('express');
 const { ObjectId } = require('mongodb');
 
-function createPostsRoutes(postCollection, userCollection, notificationCollection) {
+function createPostsRoutes(postCollection, userCollection, notificationCollection, verifyToken) {
     const router = express.Router();
 
     // ---------------------------
@@ -10,7 +10,7 @@ function createPostsRoutes(postCollection, userCollection, notificationCollectio
     // ---------------------------
 
     // get all post
-    router.get("/", async (req, res) => {
+    router.get("/", verifyToken, async (req, res) => {
 
         const result = await postCollection.aggregate([
             // sort by createdAt descending (latest first)
