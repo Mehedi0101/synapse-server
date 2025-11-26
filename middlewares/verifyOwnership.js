@@ -1,12 +1,23 @@
-const admin = require("../config/firebase");
+const verifyOwnership = (req, res, next) => {
+    const userId = req.decoded;
 
-const verifyOwnership = async (req, res, next) => {
+    const possibleKeys = ["authorId", "commenterId"];
 
-    const { authorId } = req.params;
+    const params = req.params || {};
+    const body = req.body || {};
 
-    if (authorId !== req.decoded) return res.status(403).send({ message: 'Forbidden: Access Denied' })
+    const incomingIds = [
+        ...possibleKeys.map(key => params[key]),
+        ...possibleKeys.map(key => body[key])
+    ].filter(Boolean);
+
+    const allowed = incomingIds.some(id => id === userId);
+
+    if (!allowed) {
+        return res.status(403).send({ message: "Forbidden" });
+    }
 
     next();
-}
+};
 
 module.exports = verifyOwnership;

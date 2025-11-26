@@ -30,7 +30,7 @@ const verifyToken = async (req, res, next) => {
         next();
     }
     catch (error) {
-        return res.status(401).send({ message: "Unauthorized Access" });
+        return res.status(401).send({ message: "Unauthorized" });
     }
 }
 

@@ -171,7 +171,7 @@ function createPostsRoutes(postCollection, userCollection, notificationCollectio
 
 
     // insert a post
-    router.post('/', async (req, res) => {
+    router.post('/', verifyToken, verifyOwnership, async (req, res) => {
         const { authorId, postContent } = req.body;
 
         const postData = {
@@ -187,7 +187,7 @@ function createPostsRoutes(postCollection, userCollection, notificationCollectio
 
 
     // update a post
-    router.patch('/:postId', async (req, res) => {
+    router.patch('/:postId', verifyToken, verifyOwnership, async (req, res) => {
         const { postId } = req.params;
         const { postContent } = req.body;
 
@@ -268,7 +268,7 @@ function createPostsRoutes(postCollection, userCollection, notificationCollectio
     })
 
     // patching a post for adding a comment
-    router.patch('/comments/add/:postId', async (req, res) => {
+    router.patch('/comments/add/:postId', verifyToken, verifyOwnership, async (req, res) => {
         try {
             const { postId } = req.params;
             const { commenterId, comment } = req.body;
@@ -380,7 +380,7 @@ function createPostsRoutes(postCollection, userCollection, notificationCollectio
 
 
     // patching a post for deleting a comment
-    router.patch('/comments/delete/:postId', async (req, res) => {
+    router.patch('/comments/delete/:postId', verifyToken, verifyOwnership, async (req, res) => {
         const { postId } = req.params;
         const { commentId } = req.body;
 
@@ -462,8 +462,12 @@ function createPostsRoutes(postCollection, userCollection, notificationCollectio
 
 
     // for deleting a post
-    router.delete('/:postId', async (req, res) => {
+    router.delete('/:postId', verifyToken, async (req, res) => {
         const { postId } = req.params;
+
+        const post = await postCollection.findOne({ _id: new ObjectId(postId) });
+        if (post.authorId.toString() !== req.decoded) res.status(403).send({ message: "Forbidden" });
+
         const result = await postCollection.deleteOne({ _id: new ObjectId(postId) });
         res.send(result);
     })
