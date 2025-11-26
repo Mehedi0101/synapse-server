@@ -2,10 +2,12 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const { connectDB } = require('./db');
+const initDB = require('./config/dbClient'); 
 // const cookieParser = require('cookie-parser');
+
 const verifyToken = require('./middlewares/verifyToken');
 const verifyOwnership = require('./middlewares/verifyOwnership');
+const verifyAdmin = require('./middlewares/verifyAdmin');
 
 const createUsersRoutes = require('./routes/userRoutes');
 const createPostsRoutes = require('./routes/postRoutes');
@@ -49,10 +51,10 @@ async function run() {
             chatInfoCollection,
             messageCollection,
             notificationCollection,
-        } = await connectDB();
+        } = await initDB();
 
         // ---------- user routes ----------
-        app.use('/users', createUsersRoutes(userCollection, connectionCollection));
+        app.use('/users', createUsersRoutes(userCollection, connectionCollection, verifyAdmin, verifyToken));
 
 
         // ---------- post routes ----------

@@ -2,11 +2,11 @@
 const express = require('express');
 const { ObjectId } = require('mongodb');
 
-function createUsersRoutes(userCollection, connectionCollection) {
+function createUsersRoutes(userCollection, connectionCollection, verifyAdmin, verifyToken) {
     const router = express.Router();
 
     // get all users
-    router.get('/', async (req, res) => {
+    router.get('/', verifyAdmin, async (req, res) => {
         const result = await userCollection
             .find({}, { projection: { name: 1, department: 1, role: 1, userImage: 1, email: 1 } })
             .sort({ role: 1 })
@@ -15,7 +15,7 @@ function createUsersRoutes(userCollection, connectionCollection) {
     });
 
     // get a user by id
-    router.get('/:userId', async (req, res) => {
+    router.get('/:userId', verifyToken, async (req, res) => {
         const { userId } = req.params;
         const user = await userCollection.findOne({ _id: new ObjectId(userId) });
         res.send(user || null);

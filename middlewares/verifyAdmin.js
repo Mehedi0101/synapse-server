@@ -1,8 +1,8 @@
 const admin = require("../config/firebase");
-const initDB = require("../config/dbClient");
+const initDB = require('../config/dbClient');
 
 
-const verifyToken = async (req, res, next) => {
+const verifyAdmin = async (req, res, next) => {
 
     const authHeader = req?.headers?.authorization;
 
@@ -20,12 +20,13 @@ const verifyToken = async (req, res, next) => {
             userCollection,
         } = await initDB();
 
-        const { _id: uid } = await userCollection.findOne(
+        const { role } = await userCollection.findOne(
             { email: decoded.email },
-            { projection: { _id: 1 } }
+            { projection: { role: 1 } }
         );
 
-        req.decoded = uid.toString();
+        if (role !== "Admin") return res.status(403).send({ message: "Forbidden" });
+
         next();
     }
     catch (error) {
@@ -33,4 +34,4 @@ const verifyToken = async (req, res, next) => {
     }
 }
 
-module.exports = verifyToken;
+module.exports = verifyAdmin;
