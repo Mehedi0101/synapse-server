@@ -2,7 +2,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const initDB = require('./config/dbClient'); 
+const initDB = require('./config/dbClient');
 // const cookieParser = require('cookie-parser');
 
 const verifyToken = require('./middlewares/verifyToken');
@@ -54,7 +54,7 @@ async function run() {
         } = await initDB();
 
         // ---------- user routes ----------
-        app.use('/users', createUsersRoutes(userCollection, connectionCollection, verifyAdmin, verifyToken));
+        app.use('/users', createUsersRoutes(userCollection, connectionCollection, verifyAdmin, verifyToken, verifyOwnership));
 
 
         // ---------- post routes ----------

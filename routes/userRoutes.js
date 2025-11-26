@@ -2,7 +2,7 @@
 const express = require('express');
 const { ObjectId } = require('mongodb');
 
-function createUsersRoutes(userCollection, connectionCollection, verifyAdmin, verifyToken) {
+function createUsersRoutes(userCollection, connectionCollection, verifyAdmin, verifyToken, verifyOwnership) {
     const router = express.Router();
 
     // get all users
@@ -14,6 +14,7 @@ function createUsersRoutes(userCollection, connectionCollection, verifyAdmin, ve
         res.send(result);
     });
 
+
     // get a user by id
     router.get('/:userId', verifyToken, async (req, res) => {
         const { userId } = req.params;
@@ -22,7 +23,7 @@ function createUsersRoutes(userCollection, connectionCollection, verifyAdmin, ve
     });
 
     // get a user by email
-    router.post('/email', async (req, res) => {
+    router.post('/email', verifyToken, async (req, res) => {
         const { email } = req.body;
         const query = { email: email };
         const result = await userCollection.findOne(query);
@@ -30,7 +31,7 @@ function createUsersRoutes(userCollection, connectionCollection, verifyAdmin, ve
     });
 
     // get only available users for connection request
-    router.get('/available/:userId', async (req, res) => {
+    router.get('/available/:userId', verifyToken, verifyOwnership, async (req, res) => {
         const { userId } = req.params;
 
         const requests = await connectionCollection.find({
@@ -63,7 +64,7 @@ function createUsersRoutes(userCollection, connectionCollection, verifyAdmin, ve
     });
 
     // update a user by id
-    router.patch('/:userId', async (req, res) => {
+    router.patch('/:userId', verifyToken, verifyOwnership, async (req, res) => {
         const { userId } = req.params;
         const updatedData = req.body;
         const query = { _id: new ObjectId(userId) };
@@ -75,7 +76,7 @@ function createUsersRoutes(userCollection, connectionCollection, verifyAdmin, ve
     });
 
     // delete a user
-    router.delete('/:userId', async (req, res) => {
+    router.delete('/:userId', verifyToken, verifyOwnership, async (req, res) => {
         const { userId } = req.params;
         const result = await userCollection.deleteOne({ _id: new ObjectId(userId) });
         res.send(result);

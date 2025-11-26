@@ -1,7 +1,7 @@
 const verifyOwnership = (req, res, next) => {
     const userId = req.decoded;
 
-    const possibleKeys = ["authorId", "commenterId"];
+    const possibleKeys = ["authorId", "commenterId", "userId"];
 
     const params = req.params || {};
     const body = req.body || {};
