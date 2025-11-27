@@ -2,11 +2,11 @@
 const express = require('express');
 const { ObjectId } = require('mongodb');
 
-function createMentorshipsRoutes(mentorshipCollection, userCollection, notificationCollection) {
+function createMentorshipsRoutes(mentorshipCollection, userCollection, notificationCollection, verifyToken, verifyOwnership, verifyAdmin) {
     const router = express.Router();
 
     // get all mentorship request
-    router.get('/', async (req, res) => {
+    router.get('/', verifyAdmin, async (req, res) => {
         const data = await mentorshipCollection.aggregate([
             {
                 $lookup: {
@@ -77,7 +77,7 @@ function createMentorshipsRoutes(mentorshipCollection, userCollection, notificat
             // -------- lookup accepted mentorships of this mentor --------
             {
                 $lookup: {
-                    from: "mentorships", // collection name
+                    from: "mentorship", // collection name
                     let: { mentorId: "$mentorId" },
                     pipeline: [
                         {
