@@ -2,11 +2,11 @@
 const express = require('express');
 const { ObjectId } = require('mongodb');
 
-function createResourcesRoutes(resourceCollection) {
+function createResourcesRoutes(resourceCollection, verifyToken, verifyOwnership, verifyAdmin) {
     const router = express.Router();
 
     // get all resources
-    router.get('/', async (req, res) => {
+    router.get('/', verifyAdmin, async (req, res) => {
 
         const resources = await resourceCollection.aggregate([
             {
@@ -35,7 +35,7 @@ function createResourcesRoutes(resourceCollection) {
     })
 
     // all resources contributed by a user
-    router.get('/my/:userId', async (req, res) => {
+    router.get('/my/:userId', verifyToken, verifyOwnership, async (req, res) => {
         const { userId } = req.params;
 
         const resources = await resourceCollection.aggregate([
@@ -69,7 +69,7 @@ function createResourcesRoutes(resourceCollection) {
 
 
     // all resources except author's resources
-    router.get('/all/:userId', async (req, res) => {
+    router.get('/all/:userId', verifyToken, verifyOwnership, async (req, res) => {
         const { userId } = req.params;
 
         const resources = await resourceCollection.aggregate([
@@ -103,7 +103,7 @@ function createResourcesRoutes(resourceCollection) {
 
 
     // for getting details of a resource
-    router.get('/details/:resourceId', async (req, res) => {
+    router.get('/details/:resourceId', verifyToken, async (req, res) => {
         const { resourceId } = req.params;
 
         const resource = await resourceCollection.aggregate([
@@ -137,7 +137,7 @@ function createResourcesRoutes(resourceCollection) {
 
 
     // for inserting a resource
-    router.post('/', async (req, res) => {
+    router.post('/', verifyToken, verifyOwnership, async (req, res) => {
         const resource = req.body;
         resource.createdAt = new Date();
         resource.authorId = new ObjectId(resource.authorId);
@@ -147,7 +147,7 @@ function createResourcesRoutes(resourceCollection) {
 
 
     // for updating a resource
-    router.patch('/:resourceId', async (req, res) => {
+    router.patch('/:resourceId', verifyToken, async (req, res) => {
         const { resourceId } = req.params;
         const updatedResource = req.body;
 
@@ -166,7 +166,7 @@ function createResourcesRoutes(resourceCollection) {
 
 
     // for removing a resource
-    router.delete('/:resourceId', async (req, res) => {
+    router.delete('/:resourceId', verifyToken, async (req, res) => {
         const { resourceId } = req.params;
         const result = await resourceCollection.deleteOne({ _id: new ObjectId(resourceId) });
         res.send(result);

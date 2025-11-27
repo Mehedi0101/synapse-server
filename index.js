@@ -86,7 +86,7 @@ async function run() {
 
 
         // ---------- resource routes --------------
-        app.use('/resources', createResourcesRoutes(resourceCollection));
+        app.use('/resources', createResourcesRoutes(resourceCollection, verifyToken, verifyOwnership, verifyAdmin));
 
 
         // ---------- notification routes ------------------
