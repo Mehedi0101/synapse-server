@@ -1,11 +1,12 @@
 // ---------- routes/usersRoutes.js ----------
 const express = require('express');
+const verifyAdmin = require('../middlewares/verifyAdmin');
 
 function createAdminOverviewsRoutes(userCollection, eventCollection, jobCollection, mentorshipCollection, connectionCollection) {
     const router = express.Router();
 
     // get admin overview data
-    router.get("/overview", async (req, res) => {
+    router.get("/overview", verifyAdmin, async (req, res) => {
         // ---------- Basic totals ----------
         const [totalUsers, totalEvents, totalJobs, totalMentorships] = await Promise.all([
             userCollection.countDocuments(),

@@ -90,11 +90,11 @@ async function run() {
 
 
         // ---------- notification routes ------------------
-        app.use('/notifications', createNotificationsRoutes(notificationCollection));
+        app.use('/notifications', createNotificationsRoutes(notificationCollection, verifyToken, verifyOwnership));
 
 
         // ---------- admin overview routes -------------------
-        app.use('/admin', createAdminOverviewsRoutes(userCollection, eventCollection, jobCollection, mentorshipCollection, connectionCollection));
+        app.use('/admin', createAdminOverviewsRoutes(userCollection, eventCollection, jobCollection, mentorshipCollection, connectionCollection, verifyAdmin));
 
 
         // Send a ping to confirm a successful connection

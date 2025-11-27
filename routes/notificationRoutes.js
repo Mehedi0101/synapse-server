@@ -2,11 +2,11 @@
 const express = require('express');
 const { ObjectId } = require('mongodb');
 
-function createNotificationsRoutes(notificationCollection) {
+function createNotificationsRoutes(notificationCollection, verifyToken, verifyOwnership) {
     const router = express.Router();
 
     // Get all notifications for a user
-    router.get("/:userId", async (req, res) => {
+    router.get("/:userId", verifyToken, verifyOwnership, async (req, res) => {
         try {
             const { userId } = req.params;
 
@@ -24,7 +24,7 @@ function createNotificationsRoutes(notificationCollection) {
 
 
     // Insert a new notification
-    router.post("/", async (req, res) => {
+    router.post("/", verifyToken, verifyOwnership, async (req, res) => {
         try {
             const { userId, message } = req.body;
 
@@ -48,7 +48,7 @@ function createNotificationsRoutes(notificationCollection) {
 
 
     // Delete all notifications for a user
-    router.delete("/:userId", async (req, res) => {
+    router.delete("/:userId", verifyToken, verifyOwnership, async (req, res) => {
         try {
             const { userId } = req.params;
 
