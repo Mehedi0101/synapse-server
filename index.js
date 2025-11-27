@@ -82,7 +82,7 @@ async function run() {
 
 
         // ---------- event routes -----------
-        app.use('/events', createEventsRoutes(eventCollection));
+        app.use('/events', createEventsRoutes(eventCollection, verifyToken, verifyOwnership, verifyAdmin));
 
 
         // ---------- resource routes --------------

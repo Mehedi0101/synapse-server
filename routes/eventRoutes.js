@@ -2,11 +2,11 @@
 const express = require('express');
 const { ObjectId } = require('mongodb');
 
-function createEventsRoutes(eventCollection) {
+function createEventsRoutes(eventCollection, verifyToken, verifyOwnership, verifyAdmin) {
     const router = express.Router();
 
     // Get all events
-    router.get('/', async (req, res) => {
+    router.get('/', verifyAdmin, async (req, res) => {
 
         const events = await eventCollection.aggregate([
             {
@@ -52,7 +52,7 @@ function createEventsRoutes(eventCollection) {
 
 
     // Get all events created by a user
-    router.get('/user/:userId', async (req, res) => {
+    router.get('/user/:userId', verifyToken, verifyOwnership, async (req, res) => {
         const { userId } = req.params;
 
         const events = await eventCollection.aggregate([
@@ -106,7 +106,7 @@ function createEventsRoutes(eventCollection) {
 
 
     // Get all events except mine
-    router.get('/all/:userId', async (req, res) => {
+    router.get('/all/:userId', verifyToken, verifyOwnership, async (req, res) => {
         const { userId } = req.params;
 
         const events = await eventCollection.aggregate([
@@ -161,7 +161,7 @@ function createEventsRoutes(eventCollection) {
 
 
     // get event details
-    router.get('/details/:eventId', async (req, res) => {
+    router.get('/details/:eventId', verifyToken, async (req, res) => {
         const { eventId } = req.params;
         const { userId } = req.query; // current user ID sent as query param
 
@@ -201,7 +201,7 @@ function createEventsRoutes(eventCollection) {
 
 
     // for inserting an event
-    router.post('/', async (req, res) => {
+    router.post('/', verifyToken, verifyOwnership, async (req, res) => {
         const event = req.body;
         event.creatorId = new ObjectId(event.creatorId);
         event.date = new Date(event.date);
@@ -212,7 +212,7 @@ function createEventsRoutes(eventCollection) {
 
 
     // for updating an event
-    router.patch('/:eventId', async (req, res) => {
+    router.patch('/:eventId', verifyToken, async (req, res) => {
         const { eventId } = req.params;
         const eventData = req.body;
 
@@ -229,7 +229,7 @@ function createEventsRoutes(eventCollection) {
 
 
     // for updating interested user list
-    router.patch('/interested/:eventId', async (req, res) => {
+    router.patch('/interested/:eventId', verifyToken, verifyOwnership, async (req, res) => {
         try {
             const { eventId } = req.params;
             const { userId } = req.body;
@@ -309,7 +309,7 @@ function createEventsRoutes(eventCollection) {
 
 
     // for removing an event
-    router.delete('/:eventId', async (req, res) => {
+    router.delete('/:eventId', verifyToken, async (req, res) => {
         const { eventId } = req.params;
         const result = await eventCollection.deleteOne({ _id: new ObjectId(eventId) });
         res.send(result);
