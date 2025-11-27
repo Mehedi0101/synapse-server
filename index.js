@@ -70,7 +70,7 @@ async function run() {
 
 
         // ---------- connection routes ----------------
-        app.use('/connections', createConnectionsRoutes(connectionCollection, userCollection, notificationCollection));
+        app.use('/connections', createConnectionsRoutes(connectionCollection, userCollection, notificationCollection, verifyToken, verifyOwnership));
 
 
         // ---------- mentorship routes ---------------

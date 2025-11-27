@@ -2,15 +2,15 @@
 const express = require('express');
 const { ObjectId } = require('mongodb');
 
-function createConnectionsRoutes(connectionCollection, userCollection, notificationCollection) {
+function createConnectionsRoutes(connectionCollection, userCollection, notificationCollection, verifyToken, verifyOwnership) {
     const router = express.Router();
 
     // get all received connection request
-    router.get('/received/:connectionId', async (req, res) => {
-        const { connectionId } = req.params;
+    router.get('/received/:userId', verifyToken, verifyOwnership, async (req, res) => {
+        const { userId } = req.params;
 
         const result = await connectionCollection.aggregate([
-            { $match: { to: new ObjectId(connectionId), status: "pending" } },
+            { $match: { to: new ObjectId(userId), status: "pending" } },
 
             {
                 $lookup: {
@@ -39,7 +39,7 @@ function createConnectionsRoutes(connectionCollection, userCollection, notificat
     })
 
     // get all sent connection request
-    router.get('/sent/:userId', async (req, res) => {
+    router.get('/sent/:userId', verifyToken, verifyOwnership, async (req, res) => {
         const { userId } = req.params;
 
         const result = await connectionCollection.aggregate([
@@ -72,7 +72,7 @@ function createConnectionsRoutes(connectionCollection, userCollection, notificat
     })
 
     // get all accepted connections
-    router.get('/accepted/:userId', async (req, res) => {
+    router.get('/accepted/:userId', verifyToken, verifyOwnership, async (req, res) => {
         const { userId } = req.params;
 
         const result = await connectionCollection.aggregate([
@@ -123,7 +123,7 @@ function createConnectionsRoutes(connectionCollection, userCollection, notificat
     });
 
     // insert a connection request
-    router.post('/', async (req, res) => {
+    router.post('/', verifyToken, verifyOwnership, async (req, res) => {
         try {
             const { from, to, status } = req.body;
 
@@ -165,19 +165,19 @@ function createConnectionsRoutes(connectionCollection, userCollection, notificat
     });
 
     // for accepting a connection request
-    router.patch("/accept", async (req, res) => {
+    router.patch("/accept", verifyToken, verifyOwnership, async (req, res) => {
         try {
-            const { id } = req.body;
+            const { connectionId } = req.body;
 
             // ---------- Find the connection first ----------
-            const connection = await connectionCollection.findOne({ _id: new ObjectId(id) });
+            const connection = await connectionCollection.findOne({ _id: new ObjectId(connectionId) });
             if (!connection) {
                 return res.status(404).send({ success: false, message: "Connection not found" });
             }
 
             // ---------- Update connection status ----------
             const result = await connectionCollection.updateOne(
-                { _id: new ObjectId(id) },
+                { _id: new ObjectId(connectionId) },
                 { $set: { status: "accepted" } }
             );
 
@@ -205,7 +205,7 @@ function createConnectionsRoutes(connectionCollection, userCollection, notificat
     });
 
     // for cancelling a connection request
-    router.delete('/:connectionId', async (req, res) => {
+    router.delete('/:userId/:connectionId', verifyToken, verifyOwnership, async (req, res) => {
         const { connectionId } = req.params;
         const result = await connectionCollection.deleteOne({ _id: new ObjectId(connectionId) });
         res.send(result);
