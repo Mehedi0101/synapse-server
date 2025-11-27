@@ -2,11 +2,11 @@
 const express = require('express');
 const { ObjectId } = require('mongodb');
 
-function createChatsRoutes(chatInfoCollection) {
+function createChatsRoutes(chatInfoCollection, verifyToken, verifyOwnership) {
     const router = express.Router();
 
     // fetch all chat info of a user
-    router.get("/:userId", async (req, res) => {
+    router.get("/:userId", verifyToken, verifyOwnership, async (req, res) => {
         try {
             const { userId } = req.params;
             const userObjId = new ObjectId(userId);
@@ -67,7 +67,7 @@ function createChatsRoutes(chatInfoCollection) {
     });
 
     // update chat info (unread count) after reading unread messages
-    router.patch("/read/:chatId/:userId", async (req, res) => {
+    router.patch("/read/:chatId/:userId", verifyToken, verifyOwnership, async (req, res) => {
         try {
             const { chatId, userId } = req.params;
 
