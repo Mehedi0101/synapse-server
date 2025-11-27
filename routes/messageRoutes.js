@@ -2,11 +2,11 @@
 const express = require('express');
 const { ObjectId } = require('mongodb');
 
-function createMessagesRoutes(chatInfoCollection, messageCollection) {
+function createMessagesRoutes(chatInfoCollection, messageCollection, verifyToken, verifyOwnership) {
     const router = express.Router();
 
     // get all messages between two users
-    router.get("/:userId/:friendId", async (req, res) => {
+    router.get("/:userId/:friendId", verifyToken, verifyOwnership, async (req, res) => {
         try {
             const { userId, friendId } = req.params;
 
@@ -34,7 +34,7 @@ function createMessagesRoutes(chatInfoCollection, messageCollection) {
 
 
     // inserting a messages and update chat info
-    router.post("/", async (req, res) => {
+    router.post("/", verifyToken, verifyOwnership, async (req, res) => {
         try {
             const { senderId, receiverId, text } = req.body;
 

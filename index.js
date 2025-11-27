@@ -66,7 +66,7 @@ async function run() {
 
 
         // ---------- message routes -------------
-        app.use('/messages', createMessagesRoutes(chatInfoCollection, messageCollection));
+        app.use('/messages', createMessagesRoutes(chatInfoCollection, messageCollection, verifyToken, verifyOwnership));
 
 
         // ---------- connection routes ----------------
