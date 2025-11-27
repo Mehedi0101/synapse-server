@@ -78,7 +78,7 @@ async function run() {
 
 
         // ---------- job routes ----------
-        app.use('/jobs', createJobsRoutes(jobCollection));
+        app.use('/jobs', createJobsRoutes(jobCollection, verifyToken, verifyOwnership, verifyAdmin));
 
 
         // ---------- event routes -----------

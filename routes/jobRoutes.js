@@ -2,11 +2,11 @@
 const express = require('express');
 const { ObjectId } = require('mongodb');
 
-function createJobsRoutes(jobCollection) {
+function createJobsRoutes(jobCollection, verifyToken, verifyOwnership, verifyAdmin) {
     const router = express.Router();
 
     // get all jobs
-    router.get('/', async (req, res) => {
+    router.get('/', verifyAdmin, async (req, res) => {
         const jobs = await jobCollection.aggregate([
             {
                 $lookup: {
@@ -36,7 +36,7 @@ function createJobsRoutes(jobCollection) {
 
 
     // get all jobs except current user's posted jobs
-    router.get('/:userId', async (req, res) => {
+    router.get('/:userId', verifyToken, verifyOwnership, async (req, res) => {
         const { userId } = req.params;
 
         const jobs = await jobCollection.find(
@@ -59,7 +59,7 @@ function createJobsRoutes(jobCollection) {
     });
 
     // for getting all jobs posted by a user
-    router.get('/user/:userId', async (req, res) => {
+    router.get('/user/:userId', verifyToken, verifyOwnership, async (req, res) => {
         const { userId } = req.params;
         const jobs = await jobCollection
             .find(
@@ -81,7 +81,7 @@ function createJobsRoutes(jobCollection) {
     })
 
     // for getting job details
-    router.get('/details/:jobId', async (req, res) => {
+    router.get('/details/:jobId', verifyToken, async (req, res) => {
         const { jobId } = req.params;
         const jobDetails = await jobCollection.aggregate([
             { $match: { _id: new ObjectId(jobId) } },
@@ -119,7 +119,7 @@ function createJobsRoutes(jobCollection) {
     })
 
     // for inserting a job post
-    router.post('/', async (req, res) => {
+    router.post('/', verifyToken, verifyOwnership, async (req, res) => {
         const job = req.body;
         job.authorId = new ObjectId(job.authorId);
         job.createdAt = new Date();
@@ -129,7 +129,7 @@ function createJobsRoutes(jobCollection) {
 
 
     // for updating a job post
-    router.patch('/:jobId', async (req, res) => {
+    router.patch('/:jobId', verifyToken, verifyOwnership, async (req, res) => {
         const { jobId } = req.params;
         const jobData = req.body;
         jobData.authorId = new ObjectId(jobData.authorId);
@@ -145,7 +145,7 @@ function createJobsRoutes(jobCollection) {
 
 
     // for deleting a job post
-    router.delete('/:jobId', async (req, res) => {
+    router.delete('/:jobId', verifyToken, async (req, res) => {
         const { jobId } = req.params;
         const result = await jobCollection.deleteOne({ _id: new ObjectId(jobId) });
         res.send(result);

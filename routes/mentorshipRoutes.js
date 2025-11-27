@@ -310,7 +310,7 @@ function createMentorshipsRoutes(mentorshipCollection, userCollection, notificat
 
 
     // Delete mentorship request
-    router.delete('/:id', verifyToken, async (req, res) => {
+    router.delete('/:id', verifyAdmin, async (req, res) => {
         const { id } = req.params;
 
         const result = await mentorshipCollection.deleteOne({ _id: new ObjectId(id) });
