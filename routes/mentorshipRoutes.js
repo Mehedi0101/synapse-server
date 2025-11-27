@@ -48,7 +48,7 @@ function createMentorshipsRoutes(mentorshipCollection, userCollection, notificat
 
 
     // get mentorship request details
-    router.get('/:id', async (req, res) => {
+    router.get('/:id', verifyToken, async (req, res) => {
         const { id } = req.params;
 
         const data = await mentorshipCollection.aggregate([
@@ -124,12 +124,12 @@ function createMentorshipsRoutes(mentorshipCollection, userCollection, notificat
 
 
     // get mentorship request based on the studentId
-    router.get('/student/:studentId', async (req, res) => {
-        const { studentId } = req.params;
+    router.get('/student/:userId', verifyToken, verifyOwnership, async (req, res) => {
+        const { userId } = req.params;
         const data = await mentorshipCollection.aggregate([
             {
                 $match: {
-                    studentId: new ObjectId(studentId),
+                    studentId: new ObjectId(userId),
                     status: { $in: ["assigned", "accepted", "pending"] }
                 }
             },
@@ -163,12 +163,12 @@ function createMentorshipsRoutes(mentorshipCollection, userCollection, notificat
 
 
     // get mentorship request based on the mentorId
-    router.get('/mentor/:mentorId', async (req, res) => {
-        const { mentorId } = req.params;
+    router.get('/mentor/:userId', verifyToken, verifyOwnership, async (req, res) => {
+        const { userId } = req.params;
         const data = await mentorshipCollection.aggregate([
             {
                 $match: {
-                    mentorId: new ObjectId(mentorId),
+                    mentorId: new ObjectId(userId),
                     status: { $in: ["assigned", "accepted"] }
                 }
             },
@@ -202,7 +202,7 @@ function createMentorshipsRoutes(mentorshipCollection, userCollection, notificat
 
 
     // insert a mentorship request in the database
-    router.post('/', async (req, res) => {
+    router.post('/', verifyToken, async (req, res) => {
         const request = req.body;
         request.studentId = new ObjectId(request?.studentId);
         request.mentorId = new ObjectId(request?.mentorId);
@@ -213,7 +213,9 @@ function createMentorshipsRoutes(mentorshipCollection, userCollection, notificat
         res.send(result);
     })
 
-    router.patch("/:id", async (req, res) => {
+
+    // patch a mentorship request
+    router.patch("/:id", verifyToken, async (req, res) => {
         try {
             const { id } = req.params;
             const { status, steps, currentStep } = req.body;
@@ -308,7 +310,7 @@ function createMentorshipsRoutes(mentorshipCollection, userCollection, notificat
 
 
     // Delete mentorship request
-    router.delete('/:id', async (req, res) => {
+    router.delete('/:id', verifyToken, async (req, res) => {
         const { id } = req.params;
 
         const result = await mentorshipCollection.deleteOne({ _id: new ObjectId(id) });
