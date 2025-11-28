@@ -66,6 +66,29 @@ function createChatsRoutes(chatInfoCollection, verifyToken, verifyOwnership) {
         }
     });
 
+    // fetch if user has unread messages or not
+    router.get("/unread/:userId", verifyToken, verifyOwnership, async (req, res) => {
+        const { userId } = req.params;
+
+        try {
+            const exists = await chatInfoCollection.findOne(
+                { [`unreadCount.${userId}`]: { $gt: 0 } },
+                { projection: { _id: 1 } }  // return only _id for performance
+            );
+
+            return res.json({
+                hasNewMessages: !!exists
+            });
+
+        } catch (err) {
+            return res.status(500).json({
+                error: "Internal server error",
+                details: err.message
+            });
+        }
+    });
+
+
     // update chat info (unread count) after reading unread messages
     router.patch("/read/:chatId/:userId", verifyToken, verifyOwnership, async (req, res) => {
         try {
