@@ -27,7 +27,7 @@ const port = process.env.PORT || 5000;
 // ---------- initial setup ----------
 const app = express();
 app.use(cors({
-    origin: ['http://localhost:5173', 'https://synapse-0101.web.app'],
+    origin: ['https://synapse-0101.web.app'],
     credentials: true
 }));
 app.use(express.json());

@@ -135,7 +135,7 @@ function createUsersRoutes(userCollection, connectionCollection, verifyAdmin, ve
     });
 
     // update a user by id
-    router.patch('/:userId', verifyToken, verifyOwnership, async (req, res) => {
+    router.patch('/:userId', verifyToken, async (req, res) => {
         const { userId } = req.params;
         const updatedData = req.body;
         const query = { _id: new ObjectId(userId) };
