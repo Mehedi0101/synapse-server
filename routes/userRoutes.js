@@ -15,6 +15,77 @@ function createUsersRoutes(userCollection, connectionCollection, verifyAdmin, ve
     });
 
 
+    // get all users by a keyword
+    router.get('/search/:userId', verifyToken, verifyOwnership, async (req, res) => {
+        try {
+            const { keyword } = req.query;
+            const { userId } = req.params;
+
+            if (!keyword || !keyword.trim()) {
+                return res.status(400).json({ message: "Keyword is required" });
+            }
+
+            const searchRegex = new RegExp(keyword, "i");
+
+            // ---------- fetch matching users (exclude logged-in user) ----------
+            const users = await userCollection.find({
+                _id: { $ne: new ObjectId(userId) },
+                name: { $regex: searchRegex }
+            }).toArray();
+
+            // If no users matched
+            if (users.length === 0) {
+                return res.send([]);
+            }
+
+            // ---------- fetch connection statuses for all matched users ----------
+            const targetUserIds = users.map(u => new ObjectId(u._id));
+
+            const connections = await connectionCollection.find({
+                $or: [
+                    { from: new ObjectId(userId), to: { $in: targetUserIds } },
+                    { to: new ObjectId(userId), from: { $in: targetUserIds } }
+                ]
+            }).toArray();
+
+            const connectionMap = {};
+            for (const c of connections) {
+                const otherUserId =
+                    c.from.toString() === userId
+                        ? c.to.toString()
+                        : c.from.toString();
+
+                connectionMap[otherUserId] = {
+                    connectionId: c._id,
+                    from: c.from,
+                    to: c.to,
+                    status: c.status,
+                    createdAt: c.createdAt
+                };
+            }
+
+            // ---------- final response ----------
+            const formatted = users.map(u => ({
+                id: u._id,
+                name: u.name,
+                department: u.department,
+                role: u.role,
+                image: u.userImage,
+                connectionStatus: connectionMap[u._id.toString()] || {} // empty if none
+            }));
+
+            res.send(formatted);
+
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({
+                message: "Server error",
+                error: error.message
+            });
+        }
+    });
+
+
     // get a user by id
     router.get('/:userId', verifyToken, async (req, res) => {
         const { userId } = req.params;
